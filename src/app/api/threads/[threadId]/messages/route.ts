@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { dispatchNotifications } from "@/lib/notifications/dispatch";
 import { createMessageSchema } from "@/lib/validations/thread";
 
 interface RouteContext {
@@ -49,6 +51,28 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
     .from("threads")
     .update({ updated_at: new Date().toISOString() })
     .eq("id", threadId);
+
+  const [{ data: thread }, { data: profile }] = await Promise.all([
+    supabase
+      .from("threads")
+      .select("markup_id, markups!inner ( workspace_id )")
+      .eq("id", threadId)
+      .maybeSingle(),
+    supabase.from("profiles").select("name").eq("id", user.id).maybeSingle(),
+  ]);
+  if (thread?.markup_id && thread.markups?.workspace_id) {
+    void dispatchNotifications(createServiceClient(), {
+      markupId: thread.markup_id,
+      workspaceId: thread.markups.workspace_id,
+      threadId,
+      messageId: message.id,
+      triggeredBy: user.id,
+      triggeredByName: profile?.name ?? user.email ?? "Someone",
+      contentPreview: parsed.data.content,
+      type: "reply",
+      mentionedUserIds: parsed.data.mentions ?? [],
+    });
+  }
 
   return NextResponse.json({ id: message.id }, { status: 201 });
 }

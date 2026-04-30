@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   ExternalLink,
+  History,
   Loader2,
   MessageSquarePlus,
   MousePointer2,
@@ -121,16 +122,33 @@ export function CanvasTopBar({
 
       <div className="flex items-center gap-2">
         {canShare ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="hidden sm:inline-flex"
-            onClick={() => setShareOpen(true)}
-          >
-            <Share2 className="size-4" />
-            Share
-          </Button>
+          <>
+            <Button
+              asChild
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="hidden md:inline-flex"
+              aria-label="Version history"
+            >
+              <Link
+                href={`/w/${workspaceId}/markup/${markup.id}/versions`}
+              >
+                <History className="size-4" />
+                Versions
+              </Link>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="hidden sm:inline-flex"
+              onClick={() => setShareOpen(true)}
+            >
+              <Share2 className="size-4" />
+              Share
+            </Button>
+          </>
         ) : null}
         {canApprove ? (
           <Button

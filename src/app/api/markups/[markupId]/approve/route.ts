@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { dispatchNotifications } from "@/lib/notifications/dispatch";
 
 interface RouteContext {
   params: Promise<{ markupId: string }>;
@@ -67,5 +69,25 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // Notify workspace members that the markup was approved / reopened.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("name")
+    .eq("id", user.id)
+    .maybeSingle();
+  void dispatchNotifications(createServiceClient(), {
+    markupId,
+    workspaceId: markup.workspace_id,
+    threadId: null,
+    messageId: null,
+    triggeredBy: user.id,
+    triggeredByName: profile?.name ?? user.email ?? "Someone",
+    contentPreview: approved
+      ? "Marked the MarkUp as approved."
+      : "Reopened the MarkUp for review.",
+    type: approved ? "approve" : "status_change",
+  });
+
   return NextResponse.json({ ok: true });
 }

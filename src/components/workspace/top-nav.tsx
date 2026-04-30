@@ -23,9 +23,10 @@ interface TopNavProps {
     email: string;
     avatarUrl: string | null;
   };
+  unreadCount?: number;
 }
 
-export function TopNav({ workspaceId, user }: TopNavProps) {
+export function TopNav({ workspaceId, user, unreadCount = 0 }: TopNavProps) {
   const setMobileNavOpen = useUIStore((s) => s.setMobileNavOpen);
   const initials = user.name
     .split(" ")
@@ -66,9 +67,15 @@ export function TopNav({ workspaceId, user }: TopNavProps) {
           size="icon"
           aria-label="Notifications"
           asChild
+          className="relative"
         >
           <Link href={`/w/${workspaceId}/notifications`}>
             <Bell className="size-5" strokeWidth={1.5} />
+            {unreadCount > 0 ? (
+              <span className="absolute -right-0.5 -top-0.5 flex min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            ) : null}
           </Link>
         </Button>
         <Button

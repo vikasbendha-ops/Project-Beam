@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { dispatchNotifications } from "@/lib/notifications/dispatch";
 import { guestThreadSchema } from "@/lib/validations/share";
 import { resolveShareToken } from "@/lib/share/resolve";
 
@@ -80,6 +81,24 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
       { error: messageError?.message ?? "Couldn't post message" },
       { status: 500 },
     );
+  }
+
+  const { data: markup } = await supabase
+    .from("markups")
+    .select("workspace_id")
+    .eq("id", share.markup_id)
+    .maybeSingle();
+  if (markup?.workspace_id) {
+    void dispatchNotifications(supabase, {
+      markupId: share.markup_id,
+      workspaceId: markup.workspace_id,
+      threadId: thread.id,
+      messageId: message.id,
+      triggeredBy: null,
+      triggeredByName: guest.name,
+      contentPreview: content,
+      type: "comment",
+    });
   }
 
   return NextResponse.json(

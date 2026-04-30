@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { dispatchNotifications } from "@/lib/notifications/dispatch";
 import { guestMessageSchema } from "@/lib/validations/share";
 import { resolveShareToken } from "@/lib/share/resolve";
 
@@ -65,6 +66,24 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
     .from("threads")
     .update({ updated_at: new Date().toISOString() })
     .eq("id", threadId);
+
+  const { data: markup } = await supabase
+    .from("markups")
+    .select("workspace_id")
+    .eq("id", thread.markup_id)
+    .maybeSingle();
+  if (markup?.workspace_id) {
+    void dispatchNotifications(supabase, {
+      markupId: thread.markup_id,
+      workspaceId: markup.workspace_id,
+      threadId,
+      messageId: data.id,
+      triggeredBy: null,
+      triggeredByName: guest.name,
+      contentPreview: content,
+      type: "reply",
+    });
+  }
 
   return NextResponse.json({ id: data.id }, { status: 201 });
 }

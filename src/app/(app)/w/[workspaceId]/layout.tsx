@@ -73,7 +73,11 @@ export default async function WorkspaceLayout({
       .toUpperCase(),
   };
 
-  const [{ data: profile }, { data: folderRows }] = await Promise.all([
+  const [
+    { data: profile },
+    { data: folderRows },
+    { count: unreadCount },
+  ] = await Promise.all([
     supabase
       .from("profiles")
       .select("name, email, avatar_url")
@@ -84,6 +88,11 @@ export default async function WorkspaceLayout({
       .select("id, name, parent_folder_id")
       .eq("workspace_id", workspace.id)
       .order("name"),
+    supabase
+      .from("notifications")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("read", false),
   ]);
 
   const folders = buildFolderTree(folderRows ?? []);
@@ -109,6 +118,7 @@ export default async function WorkspaceLayout({
             email: profile?.email ?? user.email ?? "",
             avatarUrl: profile?.avatar_url ?? null,
           }}
+          unreadCount={unreadCount ?? 0}
         />
         <main className="flex-1">{children}</main>
       </div>

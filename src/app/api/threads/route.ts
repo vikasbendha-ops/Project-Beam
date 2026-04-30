@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { dispatchNotifications } from "@/lib/notifications/dispatch";
 import { createThreadSchema } from "@/lib/validations/thread";
 
 /**
@@ -107,6 +109,26 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
+
+  // Fire-and-forget notifications (service-role bypasses RLS so we can
+  // insert rows for every workspace member).
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("name")
+    .eq("id", user.id)
+    .maybeSingle();
+  const triggeredByName = profile?.name ?? user.email ?? "Someone";
+  void dispatchNotifications(createServiceClient(), {
+    markupId: markup.id,
+    workspaceId: markup.workspace_id,
+    threadId: thread.id,
+    messageId: message.id,
+    triggeredBy: user.id,
+    triggeredByName,
+    contentPreview: content,
+    type: "comment",
+    mentionedUserIds: mentions ?? [],
+  });
 
   return NextResponse.json(
     {
