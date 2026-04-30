@@ -2,26 +2,30 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Archive,
-  FolderOpen,
-  Settings,
-  Star,
-  Users,
-} from "lucide-react";
+import { Archive, FolderOpen, Settings, Star, Users } from "lucide-react";
 import {
   WorkspaceSwitcher,
   type WorkspaceSummary,
 } from "@/components/workspace/workspace-switcher";
+import {
+  FolderTree,
+  type FolderNode,
+} from "@/components/workspace/folder-tree";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
   current: WorkspaceSummary;
   workspaces: WorkspaceSummary[];
+  folders?: FolderNode[];
   className?: string;
 }
 
-export function Sidebar({ current, workspaces, className }: SidebarProps) {
+export function Sidebar({
+  current,
+  workspaces,
+  folders = [],
+  className,
+}: SidebarProps) {
   const base = `/w/${current.id}`;
   const pathname = usePathname();
 
@@ -31,7 +35,6 @@ export function Sidebar({ current, workspaces, className }: SidebarProps) {
       href: `${base}?filter=shared`,
       label: "Shared with me",
       icon: Users,
-      match: () => pathname === base,
       exact: false,
     },
     {
@@ -59,7 +62,7 @@ export function Sidebar({ current, workspaces, className }: SidebarProps) {
         <WorkspaceSwitcher current={current} workspaces={workspaces} />
       </div>
 
-      <nav className="flex flex-1 flex-col gap-1 p-3">
+      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
         {items.map((item) => {
           const isActive = item.exact
             ? pathname === item.href.split("?")[0]
@@ -86,6 +89,10 @@ export function Sidebar({ current, workspaces, className }: SidebarProps) {
             </Link>
           );
         })}
+
+        <div className="mt-3 border-t border-border pt-3">
+          <FolderTree workspaceId={current.id} folders={folders} />
+        </div>
 
         <div className="mt-auto border-t border-border pt-3">
           <Link

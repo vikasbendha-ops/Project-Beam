@@ -4,6 +4,7 @@ import { TopNav } from "@/components/workspace/top-nav";
 import { MobileDrawer } from "@/components/workspace/mobile-drawer";
 import { NewMarkupModal } from "@/components/workspace/new-markup-modal";
 import { createClient } from "@/lib/supabase/server";
+import { buildFolderTree } from "@/lib/folders";
 import type { WorkspaceSummary } from "@/components/workspace/workspace-switcher";
 
 interface WorkspaceLayoutProps {
@@ -72,20 +73,34 @@ export default async function WorkspaceLayout({
       .toUpperCase(),
   };
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("name, email, avatar_url")
-    .eq("id", user.id)
-    .maybeSingle();
+  const [{ data: profile }, { data: folderRows }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("name, email, avatar_url")
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("folders")
+      .select("id, name, parent_folder_id")
+      .eq("workspace_id", workspace.id)
+      .order("name"),
+  ]);
+
+  const folders = buildFolderTree(folderRows ?? []);
 
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar
         current={current}
         workspaces={workspaces}
+        folders={folders}
         className="hidden md:flex"
       />
-      <MobileDrawer current={current} workspaces={workspaces} />
+      <MobileDrawer
+        current={current}
+        workspaces={workspaces}
+        folders={folders}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopNav
           workspaceId={workspace.id}
