@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import {
   CheckCircle2,
@@ -10,7 +9,6 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Composer } from "@/components/canvas/composer";
+import { useCanvasMutators } from "@/components/canvas/canvas-state";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type {
   CanvasCurrentUser,
@@ -35,23 +34,17 @@ interface ThreadPopoverProps {
   currentUser: CanvasCurrentUser;
 }
 
-/**
- * Floating popover that anchors next to the active pin and shows the full
- * thread inline — markup.io-style. Doesn't take over the comment list
- * sidebar.
- */
 export function ThreadPopover({
   thread,
   profiles,
   currentUser,
 }: ThreadPopoverProps) {
-  const router = useRouter();
   const setActiveThread = useCanvasStore((s) => s.setActiveThread);
   const isMobile = useIsMobile();
   const [working, setWorking] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const { postReply, setThreadStatus, deleteThread } = useCanvasMutators();
 
-  // Close on outside click.
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       const el = containerRef.current;
@@ -60,7 +53,6 @@ export function ThreadPopover({
       if ((e.target as HTMLElement).closest("[data-pin]")) return;
       setActiveThread(null);
     };
-    // Defer to next tick so the click that activated us doesn't dismiss us.
     const timer = window.setTimeout(() => {
       document.addEventListener("mousedown", handler);
     }, 0);
@@ -72,61 +64,34 @@ export function ThreadPopover({
 
   if (thread.x_position == null || thread.y_position == null) return null;
 
-  async function postReply(content: string) {
-    const res = await fetch(`/api/threads/${thread.id}/messages`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ content }),
-    });
-    if (!res.ok) {
-      const { error } = await res.json().catch(() => ({}));
-      throw new Error(error ?? "Couldn't post");
-    }
-    router.refresh();
+  async function reply(content: string) {
+    await postReply(thread.id, content);
   }
 
   async function toggleResolve() {
     setWorking(true);
-    const res = await fetch(`/api/threads/${thread.id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        status: thread.status === "resolved" ? "open" : "resolved",
-      }),
-    });
+    await setThreadStatus(
+      thread.id,
+      thread.status === "resolved" ? "open" : "resolved",
+    );
     setWorking(false);
-    if (!res.ok) {
-      const { error } = await res.json().catch(() => ({}));
-      toast.error(error ?? "Couldn't update");
-      return;
-    }
-    router.refresh();
   }
 
   async function handleDelete() {
     if (!window.confirm("Delete this thread and all replies?")) return;
     setWorking(true);
-    const res = await fetch(`/api/threads/${thread.id}`, { method: "DELETE" });
-    setWorking(false);
-    if (!res.ok) {
-      const { error } = await res.json().catch(() => ({}));
-      toast.error(error ?? "Couldn't delete");
-      return;
-    }
+    await deleteThread(thread.id);
     setActiveThread(null);
-    router.refresh();
+    setWorking(false);
   }
 
   const messages = thread.messages ?? [];
 
-  // Anchor the popover so its left edge sits at the pin and it grows to the
-  // right. If the pin is past the 60% horizontal mark, flip to grow left.
   const flipLeft = Number(thread.x_position) > 60;
   const flipUp = Number(thread.y_position) > 60;
 
   const wrapperStyle = isMobile
     ? {
-        // Bottom-sheet style on phones — full-width docked panel.
         position: "fixed" as const,
         left: 12,
         right: 12,
@@ -250,8 +215,12 @@ export function ThreadPopover({
                   addSuffix: true,
                 })
               : "";
+            const isPending = m.id.startsWith("tmp_");
             return (
-              <article key={m.id} className="flex gap-2">
+              <article
+                key={m.id}
+                className={`flex gap-2 ${isPending ? "opacity-60" : ""}`}
+              >
                 <Avatar className="size-7 shrink-0 border border-border">
                   {author?.avatar_url ? (
                     <AvatarImage src={author.avatar_url} alt={name} />
@@ -266,7 +235,7 @@ export function ThreadPopover({
                       {name}
                     </span>
                     <span className="text-[10px] text-muted-foreground">
-                      {time}
+                      {isPending ? "Sending…" : time}
                       {m.edited_at ? " · edited" : ""}
                     </span>
                   </header>
@@ -283,7 +252,7 @@ export function ThreadPopover({
           <Composer
             placeholder="Reply…"
             submitLabel="Send"
-            onSubmit={postReply}
+            onSubmit={reply}
             autoFocus
           />
         </div>

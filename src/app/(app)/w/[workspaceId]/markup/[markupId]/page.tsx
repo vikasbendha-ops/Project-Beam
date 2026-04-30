@@ -94,12 +94,16 @@ export default async function MarkupCanvasPage({ params }: MarkupPageProps) {
         .in("id", authorIds)
     : { data: [] };
 
-  // Resolve a signed URL for image/pdf canvases when stored in markup-files.
+  // Resolve a signed URL for the canvas asset. Use a 24-hour TTL so the
+  // browser can cache the same URL across page navs / refreshes within
+  // the same day — markedly faster perceived load when bouncing between
+  // markups in a folder.
+  const ONE_DAY = 60 * 60 * 24;
   let canvasUrl: string | null = markup.thumbnail_url;
   if (version?.file_url && (markup.type === "image" || markup.type === "pdf")) {
     const { data: signed } = await supabase.storage
       .from("markup-files")
-      .createSignedUrl(version.file_url, 60 * 60);
+      .createSignedUrl(version.file_url, ONE_DAY);
     canvasUrl = signed?.signedUrl ?? canvasUrl;
   }
   if (
@@ -109,7 +113,7 @@ export default async function MarkupCanvasPage({ params }: MarkupPageProps) {
   ) {
     const { data: signed } = await supabase.storage
       .from("screenshots")
-      .createSignedUrl(version.file_url, 60 * 60);
+      .createSignedUrl(version.file_url, ONE_DAY);
     canvasUrl = signed?.signedUrl ?? canvasUrl;
   }
 

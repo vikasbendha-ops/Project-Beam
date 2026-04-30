@@ -68,12 +68,14 @@ export default async function SharePage({ params }: SharePageProps) {
         .in("id", authorIds)
     : { data: [] };
 
-  // Resolve a 1-hour signed URL for the canvas image / PDF.
+  // Resolve a 24-hour signed URL for the canvas asset (longer TTL =
+  // browser cache hits across navs).
+  const ONE_DAY = 60 * 60 * 24;
   let canvasUrl: string | null = markup.thumbnail_url;
   if (version?.file_url && (markup.type === "image" || markup.type === "pdf")) {
     const { data: signed } = await supabase.storage
       .from("markup-files")
-      .createSignedUrl(version.file_url, 60 * 60);
+      .createSignedUrl(version.file_url, ONE_DAY);
     canvasUrl = signed?.signedUrl ?? canvasUrl;
   }
   if (
@@ -83,7 +85,7 @@ export default async function SharePage({ params }: SharePageProps) {
   ) {
     const { data: signed } = await supabase.storage
       .from("screenshots")
-      .createSignedUrl(version.file_url, 60 * 60);
+      .createSignedUrl(version.file_url, ONE_DAY);
     canvasUrl = signed?.signedUrl ?? canvasUrl;
   }
 

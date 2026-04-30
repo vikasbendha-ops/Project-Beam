@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useMemo } from "react";
+import { CanvasStateProvider, useCanvasMutators } from "@/components/canvas/canvas-state";
 import { CanvasTopBar } from "@/components/canvas/canvas-top-bar";
 import { CommentPanel } from "@/components/canvas/comment-panel";
 import { CommentBottomSheet } from "@/components/canvas/comment-bottom-sheet";
@@ -11,7 +12,6 @@ import { PendingPinComposer } from "@/components/canvas/pending-pin-composer";
 import { ThreadPopover } from "@/components/canvas/thread-popover";
 import { ZoomControls } from "@/components/canvas/zoom-controls";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useRealtimeCanvas } from "@/hooks/use-realtime-canvas";
 import { useCanvasStore } from "@/stores/canvas-store";
 import { cn } from "@/lib/utils";
 import type {
@@ -47,11 +47,6 @@ export function CanvasViewer({
   currentUser,
   workspaceId,
 }: CanvasViewerProps) {
-  useRealtimeCanvas(markup.id);
-  const isMobile = useIsMobile();
-  const activeThreadId = useCanvasStore((s) => s.activeThreadId);
-  const sidebarCollapsed = useCanvasStore((s) => s.sidebarCollapsed);
-
   const profileMap = useMemo(() => {
     const m: Record<string, CanvasProfile> = {};
     profiles.forEach((p) => {
@@ -59,6 +54,49 @@ export function CanvasViewer({
     });
     return m;
   }, [profiles]);
+
+  const currentName =
+    profileMap[currentUser.id]?.name ?? currentUser.email ?? "You";
+
+  return (
+    <CanvasStateProvider
+      markupId={markup.id}
+      versionId={version?.id ?? null}
+      initialThreads={threads}
+      currentUser={currentUser}
+      currentUserName={currentName}
+    >
+      <CanvasViewerInner
+        markup={markup}
+        version={version}
+        siblings={siblings}
+        profileMap={profileMap}
+        currentUser={currentUser}
+        workspaceId={workspaceId}
+      />
+    </CanvasStateProvider>
+  );
+}
+
+function CanvasViewerInner({
+  markup,
+  version,
+  siblings,
+  profileMap,
+  currentUser,
+  workspaceId,
+}: {
+  markup: CanvasMarkup;
+  version: CanvasVersion | null;
+  siblings: CanvasSibling[];
+  profileMap: Record<string, CanvasProfile>;
+  currentUser: CanvasCurrentUser;
+  workspaceId: string;
+}) {
+  const isMobile = useIsMobile();
+  const activeThreadId = useCanvasStore((s) => s.activeThreadId);
+  const sidebarCollapsed = useCanvasStore((s) => s.sidebarCollapsed);
+  const { threads } = useCanvasMutators();
 
   const activeThread = activeThreadId
     ? threads.find((t) => t.id === activeThreadId) ?? null
@@ -97,21 +135,23 @@ export function CanvasViewer({
               alt={markup.title}
               threads={threads}
               pinSize={isMobile ? 32 : 28}
-              renderOverlay={() =>
-                activeThread ? (
-                  <ThreadPopover
-                    thread={activeThread}
-                    profiles={profileMap}
-                    currentUser={currentUser}
+              renderOverlay={() => (
+                <>
+                  <PendingPinComposer
+                    markupId={markup.id}
+                    versionId={version?.id ?? null}
                   />
-                ) : null
-              }
+                  {activeThread ? (
+                    <ThreadPopover
+                      thread={activeThread}
+                      profiles={profileMap}
+                      currentUser={currentUser}
+                    />
+                  ) : null}
+                </>
+              )}
             />
           )}
-          <PendingPinComposer
-            markupId={markup.id}
-            versionId={version?.id ?? null}
-          />
           <ZoomControls />
         </main>
         {!isMobile ? (

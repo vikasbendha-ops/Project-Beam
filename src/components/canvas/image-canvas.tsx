@@ -235,22 +235,36 @@ export function ImageCanvas({
         }}
       >
         {src ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            ref={imgRef}
-            src={src}
-            alt={alt}
-            draggable={false}
-            onLoad={(e) => {
-              const target = e.currentTarget;
-              setImgSize({
-                w: target.naturalWidth,
-                h: target.naturalHeight,
-              });
-            }}
-            className="block h-full w-full select-none"
-            style={{ display: "block" }}
-          />
+          <>
+            {!imgSize ? (
+              <div
+                aria-hidden="true"
+                className="absolute inset-0 animate-pulse bg-gradient-to-br from-muted via-card to-muted/60"
+                style={{ minHeight: "70vh" }}
+              />
+            ) : null}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              ref={imgRef}
+              src={src}
+              alt={alt}
+              draggable={false}
+              onLoad={(e) => {
+                const target = e.currentTarget;
+                setImgSize({
+                  w: target.naturalWidth,
+                  h: target.naturalHeight,
+                });
+              }}
+              loading="eager"
+              decoding="async"
+              className={cn(
+                "block h-full w-full select-none transition-opacity duration-200",
+                imgSize ? "opacity-100" : "opacity-0",
+              )}
+              style={{ display: "block" }}
+            />
+          </>
         ) : (
           <div className="flex h-[60vh] items-center justify-center text-sm text-muted-foreground">
             Canvas not ready yet — screenshot is still being captured.

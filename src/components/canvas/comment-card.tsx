@@ -1,15 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import {
+  Archive,
+  ArchiveRestore,
   CheckCircle2,
   Circle,
   MoreHorizontal,
   Trash2,
 } from "lucide-react";
-import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -18,6 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useCanvasMutators } from "@/components/canvas/canvas-state";
 import { useCanvasStore } from "@/stores/canvas-store";
 import { cn } from "@/lib/utils";
 import type {
@@ -37,11 +38,11 @@ export function CommentCard({
   profiles,
   currentUser,
 }: CommentCardProps) {
-  const router = useRouter();
   const setActiveThread = useCanvasStore((s) => s.setActiveThread);
   const activeThreadId = useCanvasStore((s) => s.activeThreadId);
   const isActive = activeThreadId === thread.id;
   const [working, setWorking] = useState(false);
+  const { setThreadStatus, deleteThread } = useCanvasMutators();
 
   const firstMessage = (thread.messages ?? [])[0];
   const replyCount = Math.max((thread.messages?.length ?? 1) - 1, 0);
@@ -66,39 +67,19 @@ export function CommentCard({
 
   async function toggleResolve() {
     setWorking(true);
-    const res = await fetch(`/api/threads/${thread.id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        status: thread.status === "resolved" ? "open" : "resolved",
-      }),
-    });
+    await setThreadStatus(
+      thread.id,
+      thread.status === "resolved" ? "open" : "resolved",
+    );
     setWorking(false);
-    if (!res.ok) {
-      const { error } = await res.json().catch(() => ({}));
-      toast.error(error ?? "Couldn't update thread");
-      return;
-    }
-    router.refresh();
   }
 
   async function handleDelete() {
-    if (
-      !window.confirm(
-        "Delete this thread and all replies? This can't be undone.",
-      )
-    )
-      return;
+    if (!window.confirm("Delete this thread and all replies?")) return;
     setWorking(true);
-    const res = await fetch(`/api/threads/${thread.id}`, { method: "DELETE" });
-    setWorking(false);
-    if (!res.ok) {
-      const { error } = await res.json().catch(() => ({}));
-      toast.error(error ?? "Couldn't delete thread");
-      return;
-    }
+    await deleteThread(thread.id);
     if (activeThreadId === thread.id) setActiveThread(null);
-    router.refresh();
+    setWorking(false);
   }
 
   return (
