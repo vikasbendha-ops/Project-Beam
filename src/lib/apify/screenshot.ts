@@ -147,14 +147,20 @@ export async function persistRunScreenshot(args: {
     .update({ thumbnail_url: signed?.signedUrl ?? null })
     .eq("id", args.markupId);
 
-  await supabase.from("markup_versions").insert({
-    markup_id: args.markupId,
-    version_number: 1,
-    file_url: path,
-    file_name: "screenshot.png",
-    mime_type: "image/png",
-    file_size: bytes.byteLength,
-    uploaded_by: args.uploadedBy,
-    is_current: true,
-  });
+  // Idempotent: a re-fired webhook should refresh, not duplicate, the row.
+  await supabase
+    .from("markup_versions")
+    .upsert(
+      {
+        markup_id: args.markupId,
+        version_number: 1,
+        file_url: path,
+        file_name: "screenshot.png",
+        mime_type: "image/png",
+        file_size: bytes.byteLength,
+        uploaded_by: args.uploadedBy,
+        is_current: true,
+      },
+      { onConflict: "markup_id,version_number" },
+    );
 }
