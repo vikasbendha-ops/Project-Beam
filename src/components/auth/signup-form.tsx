@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,14 +14,18 @@ import { ResendVerificationButton } from "@/components/auth/resend-verification-
 import { createClient } from "@/lib/supabase/client";
 import { signupSchema, type SignupInput } from "@/lib/validations/auth";
 
-type ExistingUserState =
+type ExistingState =
   | { kind: "none" }
-  | { kind: "exists"; email: string };
+  | {
+      kind: "exists";
+      email: string;
+      probe: "confirmed" | "unconfirmed" | "unknown";
+    };
 
 export function SignupForm() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
-  const [existing, setExisting] = useState<ExistingUserState>({ kind: "none" });
+  const [existing, setExisting] = useState<ExistingState>({ kind: "none" });
 
   const {
     register,
@@ -31,6 +35,23 @@ export function SignupForm() {
     resolver: zodResolver(signupSchema),
     defaultValues: { name: "", email: "", password: "" },
   });
+
+  async function probe(email: string) {
+    try {
+      const res = await fetch("/api/auth/probe-email", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) return "unknown" as const;
+      const json = (await res.json()) as {
+        state: "confirmed" | "unconfirmed" | "unknown";
+      };
+      return json.state;
+    } catch {
+      return "unknown" as const;
+    }
+  }
 
   const onSubmit = handleSubmit(async (values) => {
     setExisting({ kind: "none" });
@@ -48,13 +69,12 @@ export function SignupForm() {
     });
 
     if (error) {
-      // Supabase explicit error — usually "User already registered" when
-      // `enable_signup` allows it, or rate-limit / weak-password.
       if (
         error.status === 400 &&
         error.message.toLowerCase().includes("already")
       ) {
-        setExisting({ kind: "exists", email: values.email });
+        const probed = await probe(values.email);
+        setExisting({ kind: "exists", email: values.email, probe: probed });
         return;
       }
       toast.error(error.message);
@@ -62,10 +82,10 @@ export function SignupForm() {
     }
 
     // Supabase silently returns a fake user when the email is already
-    // registered (security against email enumeration). The tell is an
-    // empty `identities` array on the returned user.
+    // registered. Detect via empty identities[].
     if (data.user && (data.user.identities?.length ?? 0) === 0) {
-      setExisting({ kind: "exists", email: values.email });
+      const probed = await probe(values.email);
+      setExisting({ kind: "exists", email: values.email, probe: probed });
       return;
     }
 
@@ -74,53 +94,7 @@ export function SignupForm() {
   });
 
   if (existing.kind === "exists") {
-    return (
-      <div className="flex flex-col gap-5">
-        <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          <AlertCircle className="mt-0.5 size-4 shrink-0" />
-          <div className="flex-1">
-            <p className="font-semibold">An account with this email exists.</p>
-            <p className="mt-1 text-amber-800">
-              Log in instead, or — if you never confirmed the original signup —
-              re-send the verification email below.
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button asChild className="flex-1">
-            <Link
-              href={`/login?email=${encodeURIComponent(existing.email)}`}
-            >
-              Log in
-            </Link>
-          </Button>
-          <ResendVerificationButton
-            email={existing.email}
-            className="flex-1"
-            variant="outline"
-            size="default"
-          />
-        </div>
-        <div className="flex flex-col items-center gap-1 text-xs text-muted-foreground">
-          <span>
-            Forgot your password?{" "}
-            <Link
-              href={`/forgot-password?email=${encodeURIComponent(existing.email)}`}
-              className="font-semibold text-primary hover:underline"
-            >
-              Reset it
-            </Link>
-          </span>
-          <button
-            type="button"
-            onClick={() => setExisting({ kind: "none" })}
-            className="font-semibold text-muted-foreground hover:text-foreground"
-          >
-            Use a different email
-          </button>
-        </div>
-      </div>
-    );
+    return <ExistingPanel state={existing} onReset={() => setExisting({ kind: "none" })} />;
   }
 
   return (
@@ -196,5 +170,129 @@ export function SignupForm() {
         )}
       </Button>
     </form>
+  );
+}
+
+interface ExistingPanelProps {
+  state: Extract<ExistingState, { kind: "exists" }>;
+  onReset: () => void;
+}
+
+function ExistingPanel({ state, onReset }: ExistingPanelProps) {
+  const { email, probe: status } = state;
+
+  if (status === "confirmed") {
+    return (
+      <div className="flex flex-col gap-5">
+        <div className="flex items-start gap-3 rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900">
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+          <div className="flex-1">
+            <p className="font-semibold">You already have a Beam account.</p>
+            <p className="mt-1 text-emerald-800">
+              <span className="font-medium">{email}</span> is registered and
+              verified. Log in to continue, or reset your password if you don't
+              remember it.
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button asChild className="flex-1">
+            <Link href={`/login?email=${encodeURIComponent(email)}`}>
+              Log in
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="flex-1">
+            <Link href={`/forgot-password?email=${encodeURIComponent(email)}`}>
+              Reset password
+            </Link>
+          </Button>
+        </div>
+        <button
+          type="button"
+          onClick={onReset}
+          className="mx-auto text-xs font-semibold text-muted-foreground hover:text-foreground"
+        >
+          Use a different email
+        </button>
+      </div>
+    );
+  }
+
+  if (status === "unconfirmed") {
+    return (
+      <div className="flex flex-col gap-5">
+        <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <AlertCircle className="mt-0.5 size-4 shrink-0" />
+          <div className="flex-1">
+            <p className="font-semibold">
+              Verification still pending for {email}.
+            </p>
+            <p className="mt-1 text-amber-800">
+              We already sent a confirmation email. Re-send it below if it
+              didn't arrive — links from previous attempts also still work.
+            </p>
+          </div>
+        </div>
+        <ResendVerificationButton
+          email={email}
+          variant="default"
+          size="default"
+        />
+        <div className="flex flex-col items-center gap-1 text-xs text-muted-foreground">
+          <span>
+            Already confirmed?{" "}
+            <Link
+              href={`/login?email=${encodeURIComponent(email)}`}
+              className="font-semibold text-primary hover:underline"
+            >
+              Log in
+            </Link>
+          </span>
+          <button
+            type="button"
+            onClick={onReset}
+            className="font-semibold text-muted-foreground hover:text-foreground"
+          >
+            Use a different email
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Unknown — couldn't probe. Show all options defensively.
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+        <AlertCircle className="mt-0.5 size-4 shrink-0" />
+        <div className="flex-1">
+          <p className="font-semibold">An account with this email exists.</p>
+          <p className="mt-1 text-amber-800">
+            Log in if you remember your password, reset it if not, or — for
+            unverified accounts — re-send the confirmation email.
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Button asChild className="flex-1">
+          <Link href={`/login?email=${encodeURIComponent(email)}`}>
+            Log in
+          </Link>
+        </Button>
+        <Button asChild variant="outline" className="flex-1">
+          <Link href={`/forgot-password?email=${encodeURIComponent(email)}`}>
+            Reset password
+          </Link>
+        </Button>
+      </div>
+      <ResendVerificationButton email={email} variant="ghost" size="sm" />
+      <button
+        type="button"
+        onClick={onReset}
+        className="mx-auto text-xs font-semibold text-muted-foreground hover:text-foreground"
+      >
+        Use a different email
+      </button>
+    </div>
   );
 }
