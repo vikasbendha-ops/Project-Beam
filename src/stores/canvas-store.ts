@@ -2,64 +2,72 @@ import { create } from "zustand";
 
 export type CanvasMode = "comment" | "browse";
 export type CommentFilter = "all" | "mine" | "resolved";
+export type FitMode = "fit-width" | "fit-height" | "actual";
 
 interface CanvasState {
   mode: CanvasMode;
-  zoom: number; // 1 = 100%
+  fit: FitMode;
+  zoom: number; // 1 = 100% (only applies when fit === "actual")
   panX: number;
   panY: number;
+  spaceHeld: boolean;
   activeThreadId: string | null;
-  /** A pending pin position (x, y in %) before the user submits the first message. */
   pendingPin: { x: number; y: number; pageNumber?: number | null } | null;
   filter: CommentFilter;
-  composerOpen: boolean;
+  hidePins: boolean;
 
   setMode: (mode: CanvasMode) => void;
+  setFit: (fit: FitMode) => void;
   setZoom: (zoom: number) => void;
   zoomIn: () => void;
   zoomOut: () => void;
   resetView: () => void;
   setPan: (x: number, y: number) => void;
+  setSpaceHeld: (v: boolean) => void;
   setActiveThread: (id: string | null) => void;
   startPin: (
     pin: { x: number; y: number; pageNumber?: number | null } | null,
   ) => void;
   setFilter: (f: CommentFilter) => void;
-  setComposerOpen: (v: boolean) => void;
+  setHidePins: (v: boolean) => void;
 }
 
 const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 4;
 
-export const useCanvasStore = create<CanvasState>((set, get) => ({
-  mode: "comment",
-  zoom: 1,
-  panX: 0,
-  panY: 0,
-  activeThreadId: null,
-  pendingPin: null,
-  filter: "all",
-  composerOpen: false,
-
-  setMode: (mode) => set({ mode }),
-  setZoom: (zoom) =>
-    set({ zoom: clamp(zoom, ZOOM_MIN, ZOOM_MAX) }),
-  zoomIn: () => {
-    const z = clamp(get().zoom * 1.25, ZOOM_MIN, ZOOM_MAX);
-    set({ zoom: z });
-  },
-  zoomOut: () => {
-    const z = clamp(get().zoom / 1.25, ZOOM_MIN, ZOOM_MAX);
-    set({ zoom: z });
-  },
-  resetView: () => set({ zoom: 1, panX: 0, panY: 0 }),
-  setPan: (panX, panY) => set({ panX, panY }),
-  setActiveThread: (activeThreadId) => set({ activeThreadId }),
-  startPin: (pendingPin) => set({ pendingPin, composerOpen: !!pendingPin }),
-  setFilter: (filter) => set({ filter }),
-  setComposerOpen: (composerOpen) => set({ composerOpen }),
-}));
-
 function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v));
 }
+
+export const useCanvasStore = create<CanvasState>((set, get) => ({
+  mode: "comment",
+  fit: "fit-width",
+  zoom: 1,
+  panX: 0,
+  panY: 0,
+  spaceHeld: false,
+  activeThreadId: null,
+  pendingPin: null,
+  filter: "all",
+  hidePins: false,
+
+  setMode: (mode) => set({ mode }),
+  setFit: (fit) => set({ fit, panX: 0, panY: 0 }),
+  setZoom: (zoom) =>
+    set({ zoom: clamp(zoom, ZOOM_MIN, ZOOM_MAX), fit: "actual" }),
+  zoomIn: () => {
+    const z = clamp(get().zoom * 1.25, ZOOM_MIN, ZOOM_MAX);
+    set({ zoom: z, fit: "actual" });
+  },
+  zoomOut: () => {
+    const z = clamp(get().zoom / 1.25, ZOOM_MIN, ZOOM_MAX);
+    set({ zoom: z, fit: "actual" });
+  },
+  resetView: () => set({ zoom: 1, panX: 0, panY: 0, fit: "fit-width" }),
+  setPan: (panX, panY) => set({ panX, panY }),
+  setSpaceHeld: (spaceHeld) => set({ spaceHeld }),
+  setActiveThread: (activeThreadId) => set({ activeThreadId }),
+  startPin: (pendingPin) => set({ pendingPin }),
+  setFilter: (filter) => set({ filter }),
+  setHidePins: (hidePins) => set({ hidePins }),
+}));

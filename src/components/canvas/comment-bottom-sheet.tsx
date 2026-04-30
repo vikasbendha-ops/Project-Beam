@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Drawer } from "vaul";
 import { MessageSquare } from "lucide-react";
-import { useCanvasStore } from "@/stores/canvas-store";
 import type {
   CanvasCurrentUser,
   CanvasProfile,
@@ -20,13 +19,10 @@ interface CommentBottomSheetProps {
 }
 
 export function CommentBottomSheet(props: CommentBottomSheetProps) {
-  const activeThreadId = useCanvasStore((s) => s.activeThreadId);
   const [open, setOpen] = useState(false);
-
-  // Auto-open when a thread becomes active (e.g., user tapped a pin).
-  useEffect(() => {
-    if (activeThreadId) setOpen(true);
-  }, [activeThreadId]);
+  // Note: pin taps now open the inline ThreadPopover (rendered as a docked
+  // mobile panel), not this sheet. The sheet is for browsing the full
+  // comment list.
 
   return (
     <>

@@ -7,9 +7,11 @@ import { CommentPanel } from "@/components/canvas/comment-panel";
 import { CommentBottomSheet } from "@/components/canvas/comment-bottom-sheet";
 import { ImageCanvas } from "@/components/canvas/image-canvas";
 import { PendingPinComposer } from "@/components/canvas/pending-pin-composer";
+import { ThreadPopover } from "@/components/canvas/thread-popover";
 import { ZoomControls } from "@/components/canvas/zoom-controls";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useRealtimeCanvas } from "@/hooks/use-realtime-canvas";
+import { useCanvasStore } from "@/stores/canvas-store";
 import type {
   CanvasCurrentUser,
   CanvasMarkup,
@@ -42,6 +44,7 @@ export function CanvasViewer({
 }: CanvasViewerProps) {
   useRealtimeCanvas(markup.id);
   const isMobile = useIsMobile();
+  const activeThreadId = useCanvasStore((s) => s.activeThreadId);
 
   const profileMap = useMemo(() => {
     const m: Record<string, CanvasProfile> = {};
@@ -50,6 +53,10 @@ export function CanvasViewer({
     });
     return m;
   }, [profiles]);
+
+  const activeThread = activeThreadId
+    ? threads.find((t) => t.id === activeThreadId) ?? null
+    : null;
 
   const isPdf = markup.type === "pdf";
 
@@ -69,7 +76,7 @@ export function CanvasViewer({
             markupId={markup.id}
           />
         ) : null}
-        <main className="relative flex flex-1 items-center justify-center overflow-hidden">
+        <main className="relative flex flex-1 overflow-hidden">
           {isPdf ? (
             <PdfCanvas src={markup.canvasUrl} threads={threads} />
           ) : (
@@ -78,6 +85,15 @@ export function CanvasViewer({
               alt={markup.title}
               threads={threads}
               pinSize={isMobile ? 32 : 28}
+              renderOverlay={() =>
+                activeThread ? (
+                  <ThreadPopover
+                    thread={activeThread}
+                    profiles={profileMap}
+                    currentUser={currentUser}
+                  />
+                ) : null
+              }
             />
           )}
           <PendingPinComposer
