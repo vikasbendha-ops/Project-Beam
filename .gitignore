@@ -39,4 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-supabase/
+
+# Supabase CLI temp dir at repo root only — must NOT match src/lib/supabase/
+/supabase/
