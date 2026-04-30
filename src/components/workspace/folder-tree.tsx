@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   ChevronDown,
   ChevronRight,
@@ -26,6 +25,12 @@ interface FolderTreeProps {
   workspaceId: string;
   folders: FolderNode[];
 }
+
+/**
+ * `application/x-beam-markup` carries `<markupId>` when a card is being
+ * dragged. Used by drop targets (folder rows, "All Projects").
+ */
+export const MARKUP_DRAG_TYPE = "application/x-beam-markup";
 
 export function FolderTree({ workspaceId, folders }: FolderTreeProps) {
   const router = useRouter();
@@ -113,11 +118,28 @@ function FolderRow({
   depth: number;
   onCreateChild: (parentId: string | null) => Promise<void>;
 }) {
+  const router = useRouter();
   const pathname = usePathname();
   const href = `/w/${workspaceId}/folder/${folder.id}`;
   const isActive = pathname === href;
   const [open, setOpen] = useState(true);
+  const [dragOver, setDragOver] = useState(false);
   const hasChildren = folder.children.length > 0;
+
+  async function handleDrop(markupId: string) {
+    const res = await fetch(`/api/markups/${markupId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ folder_id: folder.id }),
+    });
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({}));
+      toast.error(error ?? "Couldn't move");
+      return;
+    }
+    toast.success(`Moved to ${folder.name}`);
+    router.refresh();
+  }
 
   return (
     <div>
@@ -127,8 +149,24 @@ function FolderRow({
           isActive
             ? "bg-card text-primary shadow-sm"
             : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
+          dragOver && "bg-accent ring-2 ring-primary",
         )}
         style={{ paddingLeft: 8 + depth * 12 }}
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes(MARKUP_DRAG_TYPE)) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          if (!dragOver) setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          if (!e.dataTransfer.types.includes(MARKUP_DRAG_TYPE)) return;
+          e.preventDefault();
+          setDragOver(false);
+          const id = e.dataTransfer.getData(MARKUP_DRAG_TYPE);
+          if (!id) return;
+          void handleDrop(id);
+        }}
       >
         <button
           type="button"

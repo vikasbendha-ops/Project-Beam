@@ -27,14 +27,23 @@ export default async function SharePage({ params }: SharePageProps) {
     .maybeSingle();
   if (!markup) notFound();
 
-  const { data: version } = await supabase
-    .from("markup_versions")
-    .select(
-      "id, version_number, file_url, file_name, file_size, mime_type, page_count",
-    )
-    .eq("markup_id", markup.id)
-    .eq("is_current", true)
-    .maybeSingle();
+  const [{ data: version }, { data: versions }] = await Promise.all([
+    supabase
+      .from("markup_versions")
+      .select(
+        "id, version_number, file_url, file_name, file_size, mime_type, page_count",
+      )
+      .eq("markup_id", markup.id)
+      .eq("is_current", true)
+      .maybeSingle(),
+    supabase
+      .from("markup_versions")
+      .select(
+        "id, version_number, file_url, file_name, file_size, mime_type, is_current, created_at",
+      )
+      .eq("markup_id", markup.id)
+      .order("version_number", { ascending: false }),
+  ]);
 
   const { data: threads } = await supabase
     .from("threads")
@@ -103,6 +112,7 @@ export default async function SharePage({ params }: SharePageProps) {
         canvasUrl,
       }}
       version={version ?? null}
+      versions={versions ?? []}
       threads={threads ?? []}
       profiles={profiles ?? []}
     />

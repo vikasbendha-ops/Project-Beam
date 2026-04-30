@@ -3,16 +3,26 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ExternalLink, Sparkles } from "lucide-react";
-import { ImageCanvas } from "@/components/canvas/image-canvas";
-import { GuestPinComposer } from "@/components/canvas/guest-pin-composer";
+import {
+  ExternalLink,
+  History,
+  MessageSquare,
+  Sparkles,
+  X,
+} from "lucide-react";
+import { GuestCommentList } from "@/components/canvas/guest-comment-list";
 import { GuestIdentityModal } from "@/components/canvas/guest-identity-modal";
+import { GuestPinComposer } from "@/components/canvas/guest-pin-composer";
+import { GuestVersionRail } from "@/components/canvas/guest-version-rail";
+import { ImageCanvas } from "@/components/canvas/image-canvas";
 import { ZoomControls } from "@/components/canvas/zoom-controls";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { BeamWordmark } from "@/components/shared/beam-mark";
 import { Button } from "@/components/ui/button";
 import { useGuestIdentity } from "@/hooks/use-guest-identity";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useCanvasStore } from "@/stores/canvas-store";
+import { cn } from "@/lib/utils";
 import type {
   CanvasMarkup,
   CanvasProfile,
@@ -22,14 +32,31 @@ import type {
 
 const PdfCanvas = dynamic(
   () => import("@/components/canvas/pdf-canvas").then((m) => m.PdfCanvas),
-  { ssr: false, loading: () => <div className="text-sm text-muted-foreground">Loading PDF…</div> },
+  {
+    ssr: false,
+    loading: () => (
+      <div className="text-sm text-muted-foreground">Loading PDF…</div>
+    ),
+  },
 );
+
+interface GuestVersionRow {
+  id: string;
+  version_number: number;
+  file_url: string | null;
+  file_name: string | null;
+  file_size: number | null;
+  mime_type: string | null;
+  is_current: boolean;
+  created_at: string;
+}
 
 interface GuestCanvasProps {
   shareToken: string;
   canComment: boolean;
   markup: CanvasMarkup;
   version: CanvasVersion | null;
+  versions: GuestVersionRow[];
   threads: CanvasThread[];
   profiles: CanvasProfile[];
 }
@@ -38,12 +65,15 @@ export function GuestCanvas({
   shareToken,
   canComment,
   markup,
-  version,
+  versions,
   threads,
   profiles,
 }: GuestCanvasProps) {
   const isMobile = useIsMobile();
   const { identity, save, prompt, setPrompt } = useGuestIdentity();
+  const [leftOpen, setLeftOpen] = useState(false);
+  const [rightOpen, setRightOpen] = useState(false);
+
   const profileMap = useMemo(() => {
     const m: Record<string, CanvasProfile> = {};
     profiles.forEach((p) => {
@@ -52,14 +82,52 @@ export function GuestCanvas({
     return m;
   }, [profiles]);
 
+  // ESC closes whichever drawer is open.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (rightOpen) setRightOpen(false);
+        else if (leftOpen) setLeftOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [leftOpen, rightOpen]);
+
+  // When a thread is activated from the comment list (mobile especially),
+  // close the left drawer so the popover is visible.
+  const activeThreadId = useCanvasStore((s) => s.activeThreadId);
+  useEffect(() => {
+    if (activeThreadId && isMobile) setLeftOpen(false);
+  }, [activeThreadId, isMobile]);
+
+  const hasVariations = versions.length > 1;
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-muted">
-      <header className="z-20 flex h-16 shrink-0 items-center justify-between border-b border-border bg-card px-4 md:px-6">
-        <div className="flex min-w-0 items-center gap-3">
-          <BeamWordmark className="text-xl" />
-          <span className="hidden h-6 w-px bg-border sm:inline-block" />
-          <div className="min-w-0">
-            <h1 className="truncate text-sm font-semibold text-foreground sm:text-base">
+      {/* Top bar */}
+      <header className="z-30 flex h-16 shrink-0 items-center justify-between border-b border-border bg-card px-3 md:px-4">
+        <div className="flex min-w-0 items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={leftOpen ? "Hide comments" : "Show comments"}
+            aria-pressed={leftOpen}
+            onClick={() => setLeftOpen((v) => !v)}
+            className="relative"
+          >
+            <MessageSquare className="size-5" />
+            {threads.length > 0 ? (
+              <span className="absolute -right-0.5 -top-0.5 flex min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                {threads.length > 99 ? "99+" : threads.length}
+              </span>
+            ) : null}
+          </Button>
+          <BeamWordmark className="text-lg" />
+          <span className="hidden h-5 w-px bg-border sm:inline-block" />
+          <div className="hidden min-w-0 sm:block">
+            <h1 className="truncate text-sm font-semibold text-foreground">
               {markup.title}
             </h1>
             {markup.source_url ? (
@@ -67,19 +135,35 @@ export function GuestCanvas({
                 href={markup.source_url}
                 target="_blank"
                 rel="noreferrer"
-                className="hidden items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-primary sm:inline-flex"
+                className="hidden items-center gap-1 truncate text-[10px] font-medium text-muted-foreground transition-colors hover:text-primary md:inline-flex"
               >
-                <ExternalLink className="size-3" /> {markup.source_url}
+                <ExternalLink className="size-2.5" /> {markup.source_url}
               </a>
             ) : null}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <StatusPill status={markup.status} className="hidden sm:inline-flex" />
+        <div className="flex items-center gap-1.5">
+          <StatusPill
+            status={markup.status}
+            className="hidden md:inline-flex"
+            size="sm"
+          />
           {identity ? (
-            <span className="hidden items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-[11px] font-semibold text-muted-foreground sm:inline-flex">
-              Reviewing as {identity.name}
+            <span className="hidden items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-[11px] font-semibold text-muted-foreground md:inline-flex">
+              {identity.name}
             </span>
+          ) : null}
+          {hasVariations ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={rightOpen ? "Hide versions" : "Show versions"}
+              aria-pressed={rightOpen}
+              onClick={() => setRightOpen((v) => !v)}
+            >
+              <History className="size-5" />
+            </Button>
           ) : null}
           <Button asChild variant="outline" size="sm">
             <Link href="/login">Sign in</Link>
@@ -87,46 +171,113 @@ export function GuestCanvas({
         </div>
       </header>
 
-      <main className="relative flex flex-1 items-center justify-center overflow-hidden">
-        {markup.type === "pdf" ? (
-          <PdfCanvas src={markup.canvasUrl} threads={threads} />
-        ) : (
-          <ImageCanvas
-            src={markup.canvasUrl}
-            alt={markup.title}
+      <div className="relative flex flex-1 overflow-hidden">
+        {/* Left drawer — comments */}
+        <DrawerSidebar
+          open={leftOpen}
+          side="left"
+          onClose={() => setLeftOpen(false)}
+        >
+          <GuestCommentList
             threads={threads}
-            pinSize={isMobile ? 32 : 28}
+            profiles={profileMap}
+            onClose={() => setLeftOpen(false)}
           />
-        )}
+        </DrawerSidebar>
 
-        {canComment ? (
-          <GuestPinComposer
-            shareToken={shareToken}
-            identity={identity}
-            requestIdentity={() => setPrompt(true)}
-          />
+        {/* Canvas main */}
+        <main className="relative flex flex-1 overflow-hidden">
+          {markup.type === "pdf" ? (
+            <PdfCanvas src={markup.canvasUrl} threads={threads} />
+          ) : (
+            <ImageCanvas
+              src={markup.canvasUrl}
+              alt={markup.title}
+              threads={threads}
+              pinSize={isMobile ? 32 : 28}
+              renderOverlay={() =>
+                canComment ? (
+                  <GuestPinComposer
+                    shareToken={shareToken}
+                    identity={identity}
+                    requestIdentity={() => setPrompt(true)}
+                  />
+                ) : null
+              }
+            />
+          )}
+          <ZoomControls />
+          <div className="pointer-events-none absolute bottom-5 right-5 z-30 flex items-center gap-1.5 rounded-full border border-border bg-card/90 px-3 py-1 text-[11px] font-semibold text-muted-foreground backdrop-blur">
+            <Sparkles className="size-3 text-primary" /> Made with Beam
+          </div>
+          {!canComment ? (
+            <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
+              <div className="rounded-full border border-border bg-card px-4 py-1.5 text-xs font-semibold text-muted-foreground shadow-card">
+                View-only link · comments disabled
+              </div>
+            </div>
+          ) : null}
+        </main>
+
+        {/* Right drawer — versions */}
+        {hasVariations ? (
+          <DrawerSidebar
+            open={rightOpen}
+            side="right"
+            onClose={() => setRightOpen(false)}
+          >
+            <GuestVersionRail
+              versions={versions}
+              onClose={() => setRightOpen(false)}
+            />
+          </DrawerSidebar>
         ) : null}
-
-        <ZoomControls />
-
-        <div className="pointer-events-none absolute bottom-5 right-5 z-30 flex items-center gap-1.5 rounded-full border border-border bg-card/90 px-3 py-1 text-[11px] font-semibold text-muted-foreground backdrop-blur">
-          <Sparkles className="size-3 text-primary" /> Made with Beam
-        </div>
-      </main>
+      </div>
 
       <GuestIdentityModal
         open={prompt}
         onOpenChange={setPrompt}
         onSave={save}
       />
-
-      {!canComment ? (
-        <div className="pointer-events-none fixed inset-x-0 top-20 z-40 flex justify-center">
-          <div className="rounded-full border border-border bg-card px-4 py-1.5 text-xs font-semibold text-muted-foreground shadow-card">
-            View-only link · comments disabled
-          </div>
-        </div>
-      ) : null}
     </div>
+  );
+}
+
+function DrawerSidebar({
+  open,
+  side,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  side: "left" | "right";
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <>
+      {open ? (
+        <button
+          type="button"
+          aria-label="Close drawer"
+          onClick={onClose}
+          className="absolute inset-0 z-30 bg-foreground/30 backdrop-blur-[1px] md:hidden"
+        />
+      ) : null}
+      <aside
+        className={cn(
+          "absolute z-40 h-full w-[300px] shrink-0 transform bg-card shadow-modal transition-transform duration-200 ease-out md:w-[320px]",
+          side === "left" ? "left-0" : "right-0",
+          open
+            ? "translate-x-0"
+            : side === "left"
+              ? "-translate-x-full"
+              : "translate-x-full",
+        )}
+        aria-hidden={!open}
+      >
+        {children}
+      </aside>
+    </>
   );
 }

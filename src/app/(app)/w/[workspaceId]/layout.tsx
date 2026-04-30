@@ -3,6 +3,7 @@ import { Sidebar } from "@/components/workspace/sidebar";
 import { TopNav } from "@/components/workspace/top-nav";
 import { MobileDrawer } from "@/components/workspace/mobile-drawer";
 import { NewMarkupModal } from "@/components/workspace/new-markup-modal";
+import { FoldersProvider } from "@/components/workspace/folders-context";
 import { createClient } from "@/lib/supabase/server";
 import { buildFolderTree } from "@/lib/folders";
 import type { WorkspaceSummary } from "@/components/workspace/workspace-switcher";
@@ -98,31 +99,33 @@ export default async function WorkspaceLayout({
   const folders = buildFolderTree(folderRows ?? []);
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar
-        current={current}
-        workspaces={workspaces}
-        folders={folders}
-        className="hidden md:flex"
-      />
-      <MobileDrawer
-        current={current}
-        workspaces={workspaces}
-        folders={folders}
-      />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <TopNav
-          workspaceId={workspace.id}
-          user={{
-            name: profile?.name ?? user.email ?? "You",
-            email: profile?.email ?? user.email ?? "",
-            avatarUrl: profile?.avatar_url ?? null,
-          }}
-          unreadCount={unreadCount ?? 0}
+    <FoldersProvider folders={folders}>
+      <div className="flex min-h-screen bg-background">
+        <Sidebar
+          current={current}
+          workspaces={workspaces}
+          folders={folders}
+          className="hidden md:flex"
         />
-        <main className="flex-1">{children}</main>
+        <MobileDrawer
+          current={current}
+          workspaces={workspaces}
+          folders={folders}
+        />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <TopNav
+            workspaceId={workspace.id}
+            user={{
+              name: profile?.name ?? user.email ?? "You",
+              email: profile?.email ?? user.email ?? "",
+              avatarUrl: profile?.avatar_url ?? null,
+            }}
+            unreadCount={unreadCount ?? 0}
+          />
+          <main className="flex-1">{children}</main>
+        </div>
+        <NewMarkupModal workspaceId={workspace.id} />
       </div>
-      <NewMarkupModal workspaceId={workspace.id} />
-    </div>
+    </FoldersProvider>
   );
 }

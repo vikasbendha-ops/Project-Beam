@@ -3,14 +3,17 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Archive,
   ArchiveRestore,
   Calendar,
+  Check,
   FileText,
+  FolderInput,
   Globe,
   Image as ImageIcon,
+  Loader2,
   MessageSquare,
   MoreHorizontal,
   PencilLine,
@@ -37,6 +40,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MARKUP_DRAG_TYPE } from "@/components/workspace/folder-tree";
+import { useFolders } from "@/components/workspace/folders-context";
+import { cn } from "@/lib/utils";
 import type { Database } from "@/types/database";
 
 type MarkupSummary = Database["public"]["Views"]["markup_summary"]["Row"];
@@ -54,16 +60,25 @@ const TYPE_ICON = {
 
 export function MarkupCard({ markup, workspaceId }: MarkupCardProps) {
   const router = useRouter();
+  const { flat: foldersFlat } = useFolders();
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState(markup.title ?? "");
   const [renaming, setRenaming] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const [dragging, setDragging] = useState(false);
 
   const TypeIcon = markup.type ? TYPE_ICON[markup.type] : FileText;
   const updated = markup.updated_at
     ? format(new Date(markup.updated_at), "MMM d, yyyy")
     : "—";
+
+  const targetFolders = useMemo(
+    () => foldersFlat.filter((f) => f.id !== markup.folder_id),
+    [foldersFlat, markup.folder_id],
+  );
 
   async function patch(body: Record<string, unknown>, successMsg: string) {
     const res = await fetch(`/api/markups/${markup.id}`, {
@@ -113,12 +128,34 @@ export function MarkupCard({ markup, workspaceId }: MarkupCardProps) {
     router.refresh();
   }
 
+  async function handleMove(folderId: string | null, label: string) {
+    setMoving(true);
+    const ok = await patch({ folder_id: folderId }, `Moved to ${label}`);
+    setMoving(false);
+    if (ok) setMoveOpen(false);
+  }
+
   return (
     <>
-      <div className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-primary/30">
+      <div
+        draggable
+        onDragStart={(e) => {
+          if (!markup.id) return;
+          e.dataTransfer.setData(MARKUP_DRAG_TYPE, markup.id);
+          e.dataTransfer.effectAllowed = "move";
+          setDragging(true);
+        }}
+        onDragEnd={() => setDragging(false)}
+        className={cn(
+          "group relative flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-all hover:border-primary/30",
+          dragging && "scale-[0.98] opacity-50",
+        )}
+      >
         <Link
           href={`/w/${workspaceId}/markup/${markup.id}`}
           className="flex flex-col"
+          draggable={false}
+          onDragStart={(e) => e.preventDefault()}
         >
           <div className="relative aspect-video w-full overflow-hidden bg-muted">
             {markup.thumbnail_url ? (
@@ -126,8 +163,9 @@ export function MarkupCard({ markup, workspaceId }: MarkupCardProps) {
                 src={markup.thumbnail_url}
                 alt={markup.title ?? "MarkUp thumbnail"}
                 fill
-                className="object-cover"
+                className="pointer-events-none object-cover"
                 sizes="(max-width: 768px) 100vw, (max-width: 1280px) 33vw, 25vw"
+                draggable={false}
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-muted-foreground">
@@ -173,6 +211,9 @@ export function MarkupCard({ markup, workspaceId }: MarkupCardProps) {
               }}
             >
               <PencilLine className="size-4" /> Rename
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setMoveOpen(true)}>
+              <FolderInput className="size-4" /> Move to…
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={handleArchiveToggle}>
               {markup.archived ? (
@@ -233,6 +274,53 @@ export function MarkupCard({ markup, workspaceId }: MarkupCardProps) {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={moveOpen} onOpenChange={setMoveOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Move &ldquo;{markup.title}&rdquo;</DialogTitle>
+            <DialogDescription>
+              Pick a destination. You can also drag the card onto a folder
+              in the sidebar.
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="max-h-[320px] overflow-y-auto rounded-lg border border-border">
+            <FolderRow
+              label="All Projects"
+              hint="Workspace root (no folder)"
+              isCurrent={!markup.folder_id}
+              disabled={moving || !markup.folder_id}
+              onSelect={() => handleMove(null, "All Projects")}
+            />
+            {targetFolders.length === 0 ? (
+              <li className="px-4 py-3 text-xs text-muted-foreground">
+                No other folders in this workspace yet.
+              </li>
+            ) : (
+              targetFolders.map((f) => (
+                <FolderRow
+                  key={f.id}
+                  label={f.path}
+                  isCurrent={false}
+                  depth={f.depth}
+                  disabled={moving}
+                  onSelect={() => handleMove(f.id, f.name)}
+                />
+              ))
+            )}
+          </ul>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setMoveOpen(false)}
+              disabled={moving}
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -263,5 +351,49 @@ export function MarkupCard({ markup, workspaceId }: MarkupCardProps) {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function FolderRow({
+  label,
+  hint,
+  isCurrent,
+  depth = 0,
+  disabled,
+  onSelect,
+}: {
+  label: string;
+  hint?: string;
+  isCurrent: boolean;
+  depth?: number;
+  disabled?: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onSelect}
+        disabled={disabled || isCurrent}
+        style={{ paddingLeft: 16 + depth * 14 }}
+        className="flex w-full items-center gap-2 border-b border-border px-4 py-2.5 text-left text-sm last:border-b-0 hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <span className="flex-1 truncate">
+          {label}
+          {hint ? (
+            <span className="ml-2 text-[11px] text-muted-foreground">
+              {hint}
+            </span>
+          ) : null}
+        </span>
+        {isCurrent ? (
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground">
+            <Check className="size-3" /> here
+          </span>
+        ) : disabled ? (
+          <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+        ) : null}
+      </button>
+    </li>
   );
 }
