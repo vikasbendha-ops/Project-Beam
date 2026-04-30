@@ -9,6 +9,7 @@ import { CommentBottomSheet } from "@/components/canvas/comment-bottom-sheet";
 import { ImageCanvas } from "@/components/canvas/image-canvas";
 import { MarkupRail } from "@/components/canvas/markup-rail";
 import { PendingPinComposer } from "@/components/canvas/pending-pin-composer";
+import { SiblingPreloader } from "@/components/canvas/sibling-preloader";
 import { ThreadPopover } from "@/components/canvas/thread-popover";
 import { ZoomControls } from "@/components/canvas/zoom-controls";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -106,6 +107,11 @@ function CanvasViewerInner({
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-muted">
+      <SiblingPreloader
+        workspaceId={workspaceId}
+        currentId={markup.id}
+        siblings={siblings}
+      />
       <CanvasTopBar
         markup={markup}
         version={version}
