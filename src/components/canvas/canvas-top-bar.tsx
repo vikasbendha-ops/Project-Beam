@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/dashboard/status-pill";
+import { ShareModal } from "@/components/canvas/share-modal";
 import { useCanvasStore } from "@/stores/canvas-store";
 import { cn } from "@/lib/utils";
 import type {
@@ -37,7 +38,9 @@ export function CanvasTopBar({
   const mode = useCanvasStore((s) => s.mode);
   const setMode = useCanvasStore((s) => s.setMode);
   const [approving, setApproving] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const canApprove = currentUser.role !== "guest";
+  const canShare = currentUser.role !== "guest";
   const isApproved = markup.status === "approved";
 
   async function toggleApprove() {
@@ -117,20 +120,18 @@ export function CanvasTopBar({
       </div>
 
       <div className="flex items-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="hidden sm:inline-flex"
-          onClick={() => {
-            void navigator.clipboard
-              .writeText(window.location.href)
-              .then(() => toast.success("Link copied"));
-          }}
-        >
-          <Share2 className="size-4" />
-          Share
-        </Button>
+        {canShare ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="hidden sm:inline-flex"
+            onClick={() => setShareOpen(true)}
+          >
+            <Share2 className="size-4" />
+            Share
+          </Button>
+        ) : null}
         {canApprove ? (
           <Button
             type="button"
@@ -148,6 +149,13 @@ export function CanvasTopBar({
           </Button>
         ) : null}
       </div>
+      <ShareModal
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        workspaceId={workspaceId}
+        markupId={markup.id}
+        markupTitle={markup.title}
+      />
     </header>
   );
 }
