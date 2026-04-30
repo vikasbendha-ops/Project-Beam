@@ -127,12 +127,13 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // For website type, kick the Apify screenshot run in the background.
-  // We don't await it — the function returns immediately and the worker
-  // updates `markups.thumbnail_url` + creates the markup_versions row when
-  // the actor completes. Realtime listeners refresh the dashboard card.
+  // For website type, kick the Apify screenshot run. Await the start so
+  // the run is actually queued before the serverless function exits —
+  // fire-and-forget gets killed when the response returns. The kick is
+  // just an HTTP POST to Apify (~1-2s); the actor itself runs async and
+  // hits us back via /api/apify/webhook when complete.
   if (type === "website" && source_url) {
-    void kickWebsiteScreenshot({
+    await kickWebsiteScreenshot({
       markupId: markup.id,
       sourceUrl: source_url,
       uploadedBy: user.id,

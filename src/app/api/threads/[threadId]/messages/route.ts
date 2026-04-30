@@ -61,7 +61,7 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
     supabase.from("profiles").select("name").eq("id", user.id).maybeSingle(),
   ]);
   if (thread?.markup_id && thread.markups?.workspace_id) {
-    void dispatchNotifications(createServiceClient(), {
+    await dispatchNotifications(createServiceClient(), {
       markupId: thread.markup_id,
       workspaceId: thread.markups.workspace_id,
       threadId,

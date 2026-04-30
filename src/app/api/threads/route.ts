@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
     .eq("id", user.id)
     .maybeSingle();
   const triggeredByName = profile?.name ?? user.email ?? "Someone";
-  void dispatchNotifications(createServiceClient(), {
+  await dispatchNotifications(createServiceClient(), {
     markupId: markup.id,
     workspaceId: markup.workspace_id,
     threadId: thread.id,

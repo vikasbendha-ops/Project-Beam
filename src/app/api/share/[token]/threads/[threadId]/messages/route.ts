@@ -73,7 +73,7 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
     .eq("id", thread.markup_id)
     .maybeSingle();
   if (markup?.workspace_id) {
-    void dispatchNotifications(supabase, {
+    await dispatchNotifications(supabase, {
       markupId: thread.markup_id,
       workspaceId: markup.workspace_id,
       threadId,

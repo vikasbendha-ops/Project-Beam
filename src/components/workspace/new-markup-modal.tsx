@@ -26,7 +26,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useUIStore } from "@/stores/ui-store";
-import { urlMarkupSchema, type UrlMarkupInput } from "@/lib/validations/markup";
+import {
+  normalizeUrl,
+  urlMarkupSchema,
+  type UrlMarkupInput,
+} from "@/lib/validations/markup";
 import { MAX_UPLOAD_BYTES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
@@ -125,9 +129,11 @@ function UrlTab({
   });
 
   const onSubmit = form.handleSubmit(async (values) => {
-    const url = values.url.startsWith("http")
-      ? values.url
-      : `https://${values.url}`;
+    const url = normalizeUrl(values.url);
+    if (!url) {
+      toast.error("Enter a valid URL");
+      return;
+    }
     const res = await fetch("/api/markups", {
       method: "POST",
       headers: { "content-type": "application/json" },

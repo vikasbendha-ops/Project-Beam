@@ -76,7 +76,7 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
     .select("name")
     .eq("id", user.id)
     .maybeSingle();
-  void dispatchNotifications(createServiceClient(), {
+  await dispatchNotifications(createServiceClient(), {
     markupId,
     workspaceId: markup.workspace_id,
     threadId: null,
