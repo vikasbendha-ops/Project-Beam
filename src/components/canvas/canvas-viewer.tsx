@@ -6,16 +6,19 @@ import { CanvasTopBar } from "@/components/canvas/canvas-top-bar";
 import { CommentPanel } from "@/components/canvas/comment-panel";
 import { CommentBottomSheet } from "@/components/canvas/comment-bottom-sheet";
 import { ImageCanvas } from "@/components/canvas/image-canvas";
+import { MarkupRail } from "@/components/canvas/markup-rail";
 import { PendingPinComposer } from "@/components/canvas/pending-pin-composer";
 import { ThreadPopover } from "@/components/canvas/thread-popover";
 import { ZoomControls } from "@/components/canvas/zoom-controls";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useRealtimeCanvas } from "@/hooks/use-realtime-canvas";
 import { useCanvasStore } from "@/stores/canvas-store";
+import { cn } from "@/lib/utils";
 import type {
   CanvasCurrentUser,
   CanvasMarkup,
   CanvasProfile,
+  CanvasSibling,
   CanvasThread,
   CanvasVersion,
 } from "@/components/canvas/types";
@@ -28,6 +31,7 @@ const PdfCanvas = dynamic(
 interface CanvasViewerProps {
   markup: CanvasMarkup;
   version: CanvasVersion | null;
+  siblings: CanvasSibling[];
   threads: CanvasThread[];
   profiles: CanvasProfile[];
   currentUser: CanvasCurrentUser;
@@ -37,6 +41,7 @@ interface CanvasViewerProps {
 export function CanvasViewer({
   markup,
   version,
+  siblings,
   threads,
   profiles,
   currentUser,
@@ -45,6 +50,7 @@ export function CanvasViewer({
   useRealtimeCanvas(markup.id);
   const isMobile = useIsMobile();
   const activeThreadId = useCanvasStore((s) => s.activeThreadId);
+  const sidebarCollapsed = useCanvasStore((s) => s.sidebarCollapsed);
 
   const profileMap = useMemo(() => {
     const m: Record<string, CanvasProfile> = {};
@@ -64,6 +70,8 @@ export function CanvasViewer({
     <div className="flex h-screen flex-col overflow-hidden bg-muted">
       <CanvasTopBar
         markup={markup}
+        version={version}
+        siblings={siblings}
         workspaceId={workspaceId}
         currentUser={currentUser}
       />
@@ -74,6 +82,10 @@ export function CanvasViewer({
             profiles={profileMap}
             currentUser={currentUser}
             markupId={markup.id}
+            className={cn(
+              "transition-[width] duration-200",
+              sidebarCollapsed && "w-9",
+            )}
           />
         ) : null}
         <main className="relative flex flex-1 overflow-hidden">
@@ -102,6 +114,13 @@ export function CanvasViewer({
           />
           <ZoomControls />
         </main>
+        {!isMobile ? (
+          <MarkupRail
+            workspaceId={workspaceId}
+            siblings={siblings}
+            currentId={markup.id}
+          />
+        ) : null}
       </div>
       {isMobile ? (
         <CommentBottomSheet

@@ -29,7 +29,9 @@ export default async function SharePage({ params }: SharePageProps) {
 
   const { data: version } = await supabase
     .from("markup_versions")
-    .select("id, version_number, file_url, file_name, mime_type, page_count")
+    .select(
+      "id, version_number, file_url, file_name, file_size, mime_type, page_count",
+    )
     .eq("markup_id", markup.id)
     .eq("is_current", true)
     .maybeSingle();

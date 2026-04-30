@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 export type CanvasMode = "comment" | "browse";
-export type CommentFilter = "all" | "mine" | "resolved";
+export type CommentFilter = "active" | "mine" | "resolved";
 export type FitMode = "fit-width" | "fit-height" | "actual";
 
 interface CanvasState {
@@ -15,6 +15,8 @@ interface CanvasState {
   pendingPin: { x: number; y: number; pageNumber?: number | null } | null;
   filter: CommentFilter;
   hidePins: boolean;
+  sidebarCollapsed: boolean;
+  railCollapsed: boolean;
 
   setMode: (mode: CanvasMode) => void;
   setFit: (fit: FitMode) => void;
@@ -30,6 +32,8 @@ interface CanvasState {
   ) => void;
   setFilter: (f: CommentFilter) => void;
   setHidePins: (v: boolean) => void;
+  setSidebarCollapsed: (v: boolean) => void;
+  setRailCollapsed: (v: boolean) => void;
 }
 
 const ZOOM_MIN = 0.25;
@@ -48,8 +52,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   spaceHeld: false,
   activeThreadId: null,
   pendingPin: null,
-  filter: "all",
+  filter: "active",
   hidePins: false,
+  sidebarCollapsed: false,
+  railCollapsed: false,
 
   setMode: (mode) => set({ mode }),
   setFit: (fit) => set({ fit, panX: 0, panY: 0 }),
@@ -70,4 +76,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   startPin: (pendingPin) => set({ pendingPin }),
   setFilter: (filter) => set({ filter }),
   setHidePins: (hidePins) => set({ hidePins }),
+  setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
+  setRailCollapsed: (railCollapsed) => set({ railCollapsed }),
 }));

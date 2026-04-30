@@ -261,6 +261,11 @@ export function ImageCanvas({
           <>
             {threads.map((t) => {
               if (t.x_position == null || t.y_position == null) return null;
+              const firstMessage = (t.messages ?? [])[0];
+              const replyCount = Math.max(
+                (t.messages?.length ?? 1) - 1,
+                0,
+              );
               return (
                 <div key={t.id} data-pin>
                   <Pin
@@ -271,6 +276,8 @@ export function ImageCanvas({
                     resolved={t.status === "resolved"}
                     size={pinSize}
                     onClick={() => setActiveThread(t.id)}
+                    previewText={firstMessage?.content ?? undefined}
+                    replyCount={replyCount}
                   />
                 </div>
               );

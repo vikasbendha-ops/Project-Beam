@@ -20,6 +20,7 @@ export interface CanvasVersion {
   version_number: number;
   file_url: string | null;
   file_name: string | null;
+  file_size: number | null;
   mime_type: string | null;
   page_count: number | null;
 }
@@ -65,4 +66,13 @@ export interface CanvasCurrentUser {
   id: string;
   email: string;
   role: "owner" | "member" | "guest";
+}
+
+export interface CanvasSibling {
+  id: string;
+  title: string;
+  type: MarkupType;
+  thumbnail_url: string | null;
+  archived: boolean;
+  status: MarkupStatus;
 }

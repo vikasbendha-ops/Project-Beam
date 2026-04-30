@@ -23,7 +23,7 @@ export default async function MarkupCanvasPage({ params }: MarkupPageProps) {
   const { data: markup } = await supabase
     .from("markups")
     .select(
-      "id, title, type, status, source_url, thumbnail_url, workspace_id, created_by, archived",
+      "id, title, type, status, source_url, thumbnail_url, workspace_id, folder_id, created_by, archived",
     )
     .eq("id", markupId)
     .maybeSingle();
@@ -43,10 +43,25 @@ export default async function MarkupCanvasPage({ params }: MarkupPageProps) {
   // Current version: file_url for image/pdf, screenshot path for website.
   const { data: version } = await supabase
     .from("markup_versions")
-    .select("id, version_number, file_url, file_name, mime_type, page_count")
+    .select(
+      "id, version_number, file_url, file_name, file_size, mime_type, page_count",
+    )
     .eq("markup_id", markup.id)
     .eq("is_current", true)
     .maybeSingle();
+
+  // Sibling markups (same folder, same workspace) for the right rail.
+  // Order matches the dashboard listing so the strip feels like a slideshow.
+  const siblingsQuery = supabase
+    .from("markups")
+    .select("id, title, type, thumbnail_url, archived, status")
+    .eq("workspace_id", workspaceId)
+    .eq("archived", false)
+    .order("created_at", { ascending: true });
+  const { data: siblings } =
+    markup.folder_id !== null && markup.folder_id !== undefined
+      ? await siblingsQuery.eq("folder_id", markup.folder_id)
+      : await siblingsQuery.is("folder_id", null);
 
   // Threads + their messages (joined, pre-sorted by thread_number).
   const { data: threads } = await supabase
@@ -110,6 +125,7 @@ export default async function MarkupCanvasPage({ params }: MarkupPageProps) {
         canvasUrl,
       }}
       version={version ?? null}
+      siblings={siblings ?? []}
       threads={threads ?? []}
       profiles={profiles ?? []}
       currentUser={{

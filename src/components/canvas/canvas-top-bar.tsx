@@ -2,15 +2,18 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
   History,
   Loader2,
   MessageSquarePlus,
   MousePointer2,
+  PanelLeft,
   Share2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -22,27 +25,45 @@ import { cn } from "@/lib/utils";
 import type {
   CanvasCurrentUser,
   CanvasMarkup,
+  CanvasSibling,
+  CanvasVersion,
 } from "@/components/canvas/types";
 
 interface CanvasTopBarProps {
   markup: CanvasMarkup;
+  version: CanvasVersion | null;
+  siblings: CanvasSibling[];
   workspaceId: string;
   currentUser: CanvasCurrentUser;
 }
 
 export function CanvasTopBar({
   markup,
+  version,
+  siblings,
   workspaceId,
   currentUser,
 }: CanvasTopBarProps) {
   const router = useRouter();
   const mode = useCanvasStore((s) => s.mode);
   const setMode = useCanvasStore((s) => s.setMode);
+  const sidebarCollapsed = useCanvasStore((s) => s.sidebarCollapsed);
+  const setSidebarCollapsed = useCanvasStore((s) => s.setSidebarCollapsed);
   const [approving, setApproving] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const canApprove = currentUser.role !== "guest";
   const canShare = currentUser.role !== "guest";
   const isApproved = markup.status === "approved";
+
+  const { idx, prev, next, total } = useMemo(() => {
+    const i = siblings.findIndex((s) => s.id === markup.id);
+    return {
+      idx: i,
+      prev: i > 0 ? siblings[i - 1] : null,
+      next: i >= 0 && i < siblings.length - 1 ? siblings[i + 1] : null,
+      total: siblings.length,
+    };
+  }, [siblings, markup.id]);
 
   async function toggleApprove() {
     setApproving(true);
@@ -61,9 +82,21 @@ export function CanvasTopBar({
     router.refresh();
   }
 
+  const sizeLabel = version?.file_size
+    ? formatBytes(version.file_size)
+    : null;
+  const typeLabel = (() => {
+    if (markup.type === "website") return "URL";
+    if (version?.mime_type) {
+      const ext = version.mime_type.split("/").pop()?.toUpperCase();
+      return ext ?? markup.type.toUpperCase();
+    }
+    return markup.type.toUpperCase();
+  })();
+
   return (
-    <header className="z-20 flex h-16 shrink-0 items-center justify-between border-b border-border bg-card px-4 shadow-sm md:px-5">
-      <div className="flex min-w-0 items-center gap-3">
+    <header className="z-20 flex h-16 shrink-0 items-center justify-between border-b border-border bg-card px-3 shadow-sm md:px-4">
+      <div className="flex min-w-0 items-center gap-2">
         <Button
           asChild
           type="button"
@@ -75,8 +108,18 @@ export function CanvasTopBar({
             <ArrowLeft className="size-5" />
           </Link>
         </Button>
-        <div className="min-w-0">
-          <h1 className="truncate text-base font-semibold text-foreground sm:text-lg">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="hidden md:inline-flex"
+        >
+          <PanelLeft className="size-4" />
+        </Button>
+        <div className="hidden min-w-0 sm:flex sm:flex-col">
+          <h1 className="truncate text-sm font-semibold text-foreground">
             {markup.title}
           </h1>
           {markup.source_url ? (
@@ -84,43 +127,99 @@ export function CanvasTopBar({
               href={markup.source_url}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-primary"
+              className="inline-flex items-center gap-1 truncate text-[10px] font-medium text-muted-foreground transition-colors hover:text-primary"
             >
-              <ExternalLink className="size-3" /> {markup.source_url}
+              <ExternalLink className="size-2.5" /> {markup.source_url}
             </a>
           ) : null}
         </div>
-        <StatusPill status={markup.status} className="hidden sm:inline-flex" />
+        <StatusPill status={markup.status} className="hidden md:inline-flex" size="sm" />
       </div>
 
-      <div className="hidden items-center gap-1 rounded-full border border-border bg-muted p-1 md:flex">
-        <button
-          type="button"
-          onClick={() => setMode("comment")}
-          className={cn(
-            "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors",
-            mode === "comment"
-              ? "bg-card text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <MessageSquarePlus className="size-3.5" /> Comment
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("browse")}
-          className={cn(
-            "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors",
-            mode === "browse"
-              ? "bg-card text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <MousePointer2 className="size-3.5" /> Browse
-        </button>
+      {/* Center: file info + mode toggle + page nav */}
+      <div className="hidden items-center gap-3 md:flex">
+        {total > 1 ? (
+          <div className="flex items-center gap-1.5 rounded-full border border-border bg-muted px-1.5 py-1 text-[11px] font-medium text-muted-foreground">
+            <Button
+              asChild
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-6"
+              aria-label="Previous markup"
+              disabled={!prev}
+            >
+              {prev ? (
+                <Link href={`/w/${workspaceId}/markup/${prev.id}`}>
+                  <ChevronLeft className="size-3.5" />
+                </Link>
+              ) : (
+                <span>
+                  <ChevronLeft className="size-3.5" />
+                </span>
+              )}
+            </Button>
+            <span className="tabular-nums">
+              {idx + 1} <span className="text-muted-foreground/70">of {total}</span>
+            </span>
+            <Button
+              asChild
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-6"
+              aria-label="Next markup"
+              disabled={!next}
+            >
+              {next ? (
+                <Link href={`/w/${workspaceId}/markup/${next.id}`}>
+                  <ChevronRight className="size-3.5" />
+                </Link>
+              ) : (
+                <span>
+                  <ChevronRight className="size-3.5" />
+                </span>
+              )}
+            </Button>
+          </div>
+        ) : null}
+
+        <div className="flex items-center gap-1 rounded-full border border-border bg-muted p-1">
+          <button
+            type="button"
+            onClick={() => setMode("comment")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+              mode === "comment"
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <MessageSquarePlus className="size-3.5" /> Comment
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("browse")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+              mode === "browse"
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <MousePointer2 className="size-3.5" /> Browse
+          </button>
+        </div>
+
+        <div className="hidden items-center gap-1 text-[10px] font-semibold text-muted-foreground lg:flex">
+          <span className="rounded bg-muted px-1.5 py-0.5">{typeLabel}</span>
+          {sizeLabel ? (
+            <span className="rounded bg-muted px-1.5 py-0.5">{sizeLabel}</span>
+          ) : null}
+        </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         {canShare ? (
           <>
             <Button
@@ -131,11 +230,9 @@ export function CanvasTopBar({
               className="hidden md:inline-flex"
               aria-label="Version history"
             >
-              <Link
-                href={`/w/${workspaceId}/markup/${markup.id}/versions`}
-              >
+              <Link href={`/w/${workspaceId}/markup/${markup.id}/versions`}>
                 <History className="size-4" />
-                Versions
+                <span className="hidden lg:inline">Versions</span>
               </Link>
             </Button>
             <Button
@@ -176,4 +273,10 @@ export function CanvasTopBar({
       />
     </header>
   );
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
