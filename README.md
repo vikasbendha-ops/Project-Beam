@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Beam
 
-## Getting Started
+> Faster feedback on websites, images, and PDFs.
 
-First, run the development server:
+Internal visual-feedback web app inspired by markup.io. Upload images / PDFs, drop pin-style comments anchored to exact positions, share with reviewers, approve. Built for agencies and internal teams.
+
+---
+
+## Stack
+
+- **Next.js 16** (App Router, Server Components by default) + **React 19**
+- **TypeScript** strict mode
+- **Tailwind CSS v4** + **shadcn/ui**
+- **Supabase** (Auth + Postgres + Storage + Realtime)
+- **Zustand** (canvas state) + **React Hook Form** + **Zod**
+- **pdfjs-dist** for PDF rendering
+- **Resend** for transactional email
+- **Apify** (optional v1) for website screenshots
+
+Full spec: [`PROJECT_BRIEF.md`](PROJECT_BRIEF.md), [`TECH_STACK.md`](TECH_STACK.md), [`DATABASE_SCHEMA.sql`](DATABASE_SCHEMA.sql).
+
+---
+
+## Local setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
+cp .env.example .env.local   # then fill in real values
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+App runs at <http://localhost:3000>.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Required env vars
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+See `.env.example`. The Supabase **anon** + **service-role** keys come from the project's API settings page; the **access token** is a personal-access token used only locally for migrations and type generation.
 
-## Learn More
+### Database
 
-To learn more about Next.js, take a look at the following resources:
+Schema lives in [`DATABASE_SCHEMA.sql`](DATABASE_SCHEMA.sql) and is already deployed to the connected Supabase project. To re-deploy from scratch, paste the file into Supabase Dashboard → SQL Editor.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Regenerate Supabase types
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+./scripts/generate-types.sh
+```
 
-## Deploy on Vercel
+Writes `src/types/database.ts` from the live schema using the access token in `.env.local`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Build phases
+
+Build proceeds in vertical slices following `PROJECT_BRIEF.md` Section 8:
+
+1. **Foundation** — scaffold, theme, Supabase clients, schema, repo
+2. **Auth** — signup / login / forgot password
+3. **Workspace + Dashboard** — sidebar, folders, switcher
+4. **Upload + MarkUps** — image/PDF upload, grid cards
+5. **Canvas viewer** *(hero)* — pins, comments, realtime
+6. **Sharing** — share modal, public guest view
+7. **Versioning + Notifications** — versions, Resend emails
+8. **Polish + optional website type** — settings, Apify
+
+---
+
+## Deployment
+
+Push to `main`, connect Vercel project. All env vars from `.env.local` go into Vercel project settings (the `SUPABASE_ACCESS_TOKEN` is **not** needed in production runtime — only locally).
