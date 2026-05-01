@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
   const [{ data: workspace }, { data: profile }] = await Promise.all([
     supabase
       .from("workspaces")
-      .select("name")
+      .select("name, plan")
       .eq("id", workspace_id)
       .maybeSingle(),
     supabase.from("profiles").select("name").eq("id", user.id).maybeSingle(),
@@ -61,6 +61,26 @@ export async function POST(request: NextRequest) {
 
   if (!workspace)
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
+
+  // Seat limit only applies to member-role invites; guest share links are
+  // always free.
+  if (role === "member") {
+    const { PLAN_LIMITS, isPlan } = await import("@/lib/plan");
+    const plan = isPlan(workspace.plan) ? workspace.plan : "free";
+    const seatCap = PLAN_LIMITS[plan].seats;
+    const { count: memberCount } = await supabase
+      .from("workspace_members")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", workspace_id);
+    if ((memberCount ?? 0) + emails.length > seatCap) {
+      return NextResponse.json(
+        {
+          error: `${plan.toUpperCase()} plan allows ${seatCap} members. Upgrade in Settings → Plan & billing to add more.`,
+        },
+        { status: 402 },
+      );
+    }
+  }
 
   const inviterName = profile?.name ?? user.email ?? "Someone";
 

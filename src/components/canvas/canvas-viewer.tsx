@@ -81,6 +81,7 @@ export function CanvasViewer({
         markup={markup}
         version={version}
         siblings={siblings}
+        profiles={profiles}
         profileMap={profileMap}
         currentUser={currentUser}
         workspaceId={workspaceId}
@@ -93,6 +94,7 @@ function CanvasViewerInner({
   markup,
   version,
   siblings,
+  profiles,
   profileMap,
   currentUser,
   workspaceId,
@@ -100,6 +102,7 @@ function CanvasViewerInner({
   markup: CanvasMarkup;
   version: CanvasVersion | null;
   siblings: CanvasSibling[];
+  profiles: CanvasProfile[];
   profileMap: Record<string, CanvasProfile>;
   currentUser: CanvasCurrentUser;
   workspaceId: string;
@@ -133,6 +136,8 @@ function CanvasViewerInner({
           <PendingPinComposer
             markupId={markup.id}
             versionId={version?.id ?? null}
+            workspaceId={workspaceId}
+            members={profiles}
           />
         ) : null}
         {popoverHere ? (
@@ -140,6 +145,8 @@ function CanvasViewerInner({
             thread={activeThread}
             profiles={profileMap}
             currentUser={currentUser}
+            workspaceId={workspaceId}
+            members={profiles}
           />
         ) : null}
       </>

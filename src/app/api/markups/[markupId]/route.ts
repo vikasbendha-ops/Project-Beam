@@ -140,7 +140,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_request: NextRequest, ctx: RouteContext) {
+export async function DELETE(request: NextRequest, ctx: RouteContext) {
   const { markupId } = await ctx.params;
   const supabase = await createClient();
   const {
@@ -149,9 +149,25 @@ export async function DELETE(_request: NextRequest, ctx: RouteContext) {
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { error } = await supabase.from("markups").delete().eq("id", markupId);
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  // ?purge=1 skips trash and hard-deletes immediately. Used by the trash UI.
+  const purge = new URL(request.url).searchParams.get("purge") === "1";
+  if (purge) {
+    const { error } = await supabase
+      .from("markups")
+      .delete()
+      .eq("id", markupId);
+    if (error)
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
   }
-  return NextResponse.json({ ok: true });
+
+  // Default: soft-delete by stamping deleted_at. Trash view + restore endpoint
+  // can recover within the retention window.
+  const { error } = await supabase
+    .from("markups")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", markupId);
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true, trashed: true });
 }

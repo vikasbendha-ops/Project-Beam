@@ -1,14 +1,17 @@
 "use client";
 
 import { X } from "lucide-react";
-import { Composer } from "@/components/canvas/composer";
+import { Composer, type ComposerSubmit } from "@/components/canvas/composer";
 import { Button } from "@/components/ui/button";
 import { useCanvasMutators } from "@/components/canvas/canvas-state";
 import { useCanvasStore } from "@/stores/canvas-store";
+import type { CanvasProfile } from "@/components/canvas/types";
 
 interface PendingPinComposerProps {
   markupId: string;
   versionId: string | null;
+  workspaceId?: string;
+  members?: CanvasProfile[];
 }
 
 /**
@@ -19,6 +22,8 @@ interface PendingPinComposerProps {
 export function PendingPinComposer({
   markupId: _markupId,
   versionId: _versionId,
+  workspaceId,
+  members = [],
 }: PendingPinComposerProps) {
   const pendingPin = useCanvasStore((s) => s.pendingPin);
   const startPin = useCanvasStore((s) => s.startPin);
@@ -32,13 +37,15 @@ export function PendingPinComposer({
   const flipLeft = pendingPin.x > 60;
   const flipUp = pendingPin.y > 60;
 
-  async function submit(content: string) {
+  async function submit(payload: ComposerSubmit) {
     if (!pendingPin) return;
     const id = await createThread({
       x: pendingPin.x,
       y: pendingPin.y,
       pageNumber: pendingPin.pageNumber,
-      content,
+      content: payload.content,
+      mentions: payload.mentions,
+      attachments: payload.attachments,
     });
     if (id) {
       startPin(null);
@@ -81,6 +88,13 @@ export function PendingPinComposer({
             submitLabel="Post"
             autoFocus
             onSubmit={submit}
+            members={members.map((m) => ({
+              id: m.id,
+              name: m.name,
+              email: m.email,
+              avatar_url: m.avatar_url,
+            }))}
+            workspaceId={workspaceId}
           />
         </div>
       </div>

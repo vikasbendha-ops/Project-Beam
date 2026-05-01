@@ -96,17 +96,32 @@ function reducer(state: CanvasThread[], action: Action): CanvasThread[] {
   }
 }
 
+interface MessageAttachment {
+  url: string;
+  filename: string;
+  size: number;
+  mime_type: string;
+}
+
 interface CreateThreadInput {
   x: number;
   y: number;
   pageNumber?: number | null;
   content: string;
+  mentions?: string[];
+  attachments?: MessageAttachment[];
+}
+
+interface PostReplyInput {
+  content: string;
+  mentions?: string[];
+  attachments?: MessageAttachment[];
 }
 
 interface CanvasMutators {
   threads: CanvasThread[];
   createThread: (input: CreateThreadInput) => Promise<string | null>;
-  postReply: (threadId: string, content: string) => Promise<void>;
+  postReply: (threadId: string, input: PostReplyInput) => Promise<void>;
   setThreadStatus: (
     threadId: string,
     status: "open" | "resolved",
@@ -316,8 +331,8 @@ export function CanvasStateProvider({
           {
             id: tempMessageId,
             content: input.content,
-            attachments: [],
-            mentions: [],
+            attachments: input.attachments ?? [],
+            mentions: input.mentions ?? [],
             reactions: {},
             created_by: currentUser.id,
             guest_name: null,
@@ -342,6 +357,8 @@ export function CanvasStateProvider({
             y_position: input.y,
             page_number: input.pageNumber ?? null,
             content: input.content,
+            mentions: input.mentions ?? [],
+            attachments: input.attachments ?? [],
           }),
         });
         if (!res.ok) {
@@ -381,13 +398,13 @@ export function CanvasStateProvider({
   );
 
   const postReply = useCallback(
-    async (threadId: string, content: string) => {
+    async (threadId: string, input: PostReplyInput) => {
       const tempId = `tmp_${Date.now()}_${Math.random()}`;
       const tempMessage: CanvasMessage = {
         id: tempId,
-        content,
-        attachments: [],
-        mentions: [],
+        content: input.content,
+        attachments: input.attachments ?? [],
+        mentions: input.mentions ?? [],
         reactions: {},
         created_by: currentUser.id,
         guest_name: null,
@@ -402,7 +419,11 @@ export function CanvasStateProvider({
         const res = await fetch(`/api/threads/${threadId}/messages`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ content }),
+          body: JSON.stringify({
+            content: input.content,
+            mentions: input.mentions ?? [],
+            attachments: input.attachments ?? [],
+          }),
         });
         if (!res.ok) {
           const { error } = await res.json().catch(() => ({}));

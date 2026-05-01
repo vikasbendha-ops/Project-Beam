@@ -22,7 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Composer } from "@/components/canvas/composer";
+import { Composer, type ComposerSubmit } from "@/components/canvas/composer";
 import { useCanvasMutators } from "@/components/canvas/canvas-state";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type {
@@ -37,12 +37,16 @@ interface ThreadPopoverProps {
   thread: CanvasThread;
   profiles: Record<string, CanvasProfile>;
   currentUser: CanvasCurrentUser;
+  workspaceId?: string;
+  members?: CanvasProfile[];
 }
 
 export function ThreadPopover({
   thread,
   profiles,
   currentUser,
+  workspaceId,
+  members = [],
 }: ThreadPopoverProps) {
   const setActiveThread = useCanvasStore((s) => s.setActiveThread);
   const isMobile = useIsMobile();
@@ -77,8 +81,12 @@ export function ThreadPopover({
 
   if (thread.x_position == null || thread.y_position == null) return null;
 
-  async function reply(content: string) {
-    await postReply(thread.id, content);
+  async function reply(payload: ComposerSubmit) {
+    await postReply(thread.id, {
+      content: payload.content,
+      mentions: payload.mentions,
+      attachments: payload.attachments,
+    });
   }
 
   async function toggleResolve() {
@@ -273,6 +281,13 @@ export function ThreadPopover({
             submitLabel="Send"
             onSubmit={reply}
             autoFocus
+            members={members.map((m) => ({
+              id: m.id,
+              name: m.name,
+              email: m.email,
+              avatar_url: m.avatar_url,
+            }))}
+            workspaceId={workspaceId}
           />
         </div>
       </div>
@@ -439,9 +454,10 @@ function MessageItem({
           </div>
         ) : (
           <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-foreground">
-            {m.content}
+            <RichContent content={m.content} />
           </p>
         )}
+        {!editing ? <AttachmentList attachments={m.attachments} /> : null}
         {!editing ? (
           <ReactionRow
             reactions={
@@ -544,5 +560,74 @@ function ReactionRow({
         );
       })}
     </div>
+  );
+}
+
+interface MessageAttachment {
+  url: string;
+  filename: string;
+  size: number;
+  mime_type: string;
+}
+
+function AttachmentList({ attachments }: { attachments: unknown }) {
+  const list = (attachments as MessageAttachment[] | null) ?? [];
+  if (!Array.isArray(list) || list.length === 0) return null;
+  return (
+    <ul className="mt-2 flex flex-wrap gap-1.5">
+      {list.map((a, i) => (
+        <li key={`${a.url}-${i}`}>
+          {a.mime_type?.startsWith("image/") ? (
+            <a
+              href={a.url}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="block overflow-hidden rounded-md border border-border"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={a.url}
+                alt={a.filename}
+                className="h-24 w-auto object-cover"
+                loading="lazy"
+              />
+            </a>
+          ) : (
+            <a
+              href={a.url}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium text-foreground hover:bg-accent"
+            >
+              📎 {a.filename}
+            </a>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * Render @-mentions as styled chips. Anything else passes through. Mentions
+ * keep the same handle-form (`@FirstLast`) the composer wrote.
+ */
+function RichContent({ content }: { content: string }) {
+  const parts = content.split(/(@[A-Za-z0-9_]+)/g);
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.startsWith("@") && p.length > 1 ? (
+          <span
+            key={i}
+            className="rounded bg-primary/10 px-1 py-0.5 font-semibold text-primary"
+          >
+            {p}
+          </span>
+        ) : (
+          <span key={i}>{p}</span>
+        ),
+      )}
+    </>
   );
 }

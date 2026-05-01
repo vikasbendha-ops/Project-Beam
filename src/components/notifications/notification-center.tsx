@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -437,7 +437,13 @@ function NotificationRow({
     : `/w/${workspaceId}`;
 
   return (
-    <li className={cn("relative", !n.read && "bg-accent/30")}>
+    <SwipeableRow
+      isUnread={!n.read}
+      onSwipeLeft={() => {
+        if (!n.read) onMarkRead(n.id);
+      }}
+      className={cn(!n.read && "bg-accent/30")}
+    >
       <Link
         href={href}
         onClick={() => {
@@ -495,6 +501,65 @@ function NotificationRow({
           </p>
         </div>
       </Link>
+    </SwipeableRow>
+  );
+}
+
+/**
+ * Touch-only swipe-left handler. Translates the row, snaps back if the
+ * swipe didn't cross the threshold; otherwise fires onSwipeLeft. Hidden
+ * "Mark read" backdrop reveals as the user drags.
+ */
+function SwipeableRow({
+  children,
+  onSwipeLeft,
+  isUnread,
+  className,
+}: {
+  children: React.ReactNode;
+  onSwipeLeft: () => void;
+  isUnread: boolean;
+  className?: string;
+}) {
+  const startX = useRef<number | null>(null);
+  const [dx, setDx] = useState(0);
+
+  function onTouchStart(e: React.TouchEvent) {
+    startX.current = e.touches[0]!.clientX;
+  }
+  function onTouchMove(e: React.TouchEvent) {
+    if (startX.current == null) return;
+    const delta = e.touches[0]!.clientX - startX.current;
+    if (delta < 0) setDx(Math.max(-160, delta));
+  }
+  function onTouchEnd() {
+    if (startX.current == null) return;
+    const fired = dx <= -80 && isUnread;
+    startX.current = null;
+    setDx(0);
+    if (fired) onSwipeLeft();
+  }
+
+  return (
+    <li
+      className={cn("relative overflow-hidden", className)}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
+      {dx < 0 ? (
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex w-[120px] items-center justify-end bg-primary/90 px-4 text-xs font-semibold uppercase tracking-wider text-primary-foreground">
+          Mark read
+        </div>
+      ) : null}
+      <div
+        style={{
+          transform: dx ? `translateX(${dx}px)` : undefined,
+          transition: dx ? "none" : "transform 200ms ease",
+        }}
+      >
+        {children}
+      </div>
     </li>
   );
 }

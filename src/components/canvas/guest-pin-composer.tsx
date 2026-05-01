@@ -40,7 +40,7 @@ export function GuestPinComposer({
 
   if (!pendingPin || !identity) return null;
 
-  async function submit(content: string) {
+  async function submit(payload: { content: string }) {
     if (!pendingPin || !identity) return;
     const res = await fetch(`/api/share/${shareToken}/threads`, {
       method: "POST",
@@ -50,7 +50,7 @@ export function GuestPinComposer({
         x_position: pendingPin.x,
         y_position: pendingPin.y,
         page_number: pendingPin.pageNumber ?? null,
-        content,
+        content: payload.content,
       }),
     });
     if (!res.ok) {

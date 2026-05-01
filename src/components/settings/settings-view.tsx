@@ -1,18 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Activity,
   Bell,
   Building2,
+  CreditCard,
   ImagePlus,
   Loader2,
   LogOut,
-  Plug,
   Trash2,
   User,
-  Webhook,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -22,6 +22,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
+type Plan = "free" | "pro" | "team";
+
 interface SettingsViewProps {
   workspace: {
     id: string;
@@ -29,6 +31,9 @@ interface SettingsViewProps {
     owner_id: string;
     is_personal: boolean;
     avatar_url: string | null;
+    plan: Plan;
+    plan_seats: number;
+    plan_renews_at: string | null;
   };
   profile: {
     id: string;
@@ -43,14 +48,17 @@ interface SettingsViewProps {
     browser_push_enabled: boolean;
   };
   isOwner: boolean;
+  usage: {
+    markups: number;
+    members: number;
+  };
 }
 
 type Tab =
   | "profile"
   | "workspace"
   | "notifications"
-  | "integrations"
-  | "webhooks"
+  | "billing"
   | "audit"
   | "danger";
 
@@ -59,6 +67,7 @@ export function SettingsView({
   profile,
   preferences,
   isOwner,
+  usage,
 }: SettingsViewProps) {
   const [tab, setTab] = useState<Tab>("profile");
 
@@ -70,8 +79,7 @@ export function SettingsView({
     { id: "profile", label: "Profile", icon: User },
     { id: "workspace", label: "Workspace", icon: Building2 },
     { id: "notifications", label: "Notifications", icon: Bell },
-    { id: "integrations", label: "Integrations", icon: Plug },
-    { id: "webhooks", label: "Webhooks", icon: Webhook },
+    { id: "billing", label: "Plan & billing", icon: CreditCard },
     { id: "audit", label: "Audit log", icon: Activity },
     { id: "danger", label: "Danger zone", icon: Trash2 },
   ];
@@ -110,16 +118,18 @@ export function SettingsView({
         <main>
           {tab === "profile" ? <ProfileTab profile={profile} /> : null}
           {tab === "workspace" ? (
-            <WorkspaceTab
-              workspace={workspace}
-              isOwner={isOwner}
-            />
+            <WorkspaceTab workspace={workspace} isOwner={isOwner} />
           ) : null}
           {tab === "notifications" ? (
             <NotificationsTab preferences={preferences} />
           ) : null}
-          {tab === "integrations" ? <IntegrationsTab /> : null}
-          {tab === "webhooks" ? <WebhooksTab /> : null}
+          {tab === "billing" ? (
+            <BillingTab
+              workspace={workspace}
+              isOwner={isOwner}
+              usage={usage}
+            />
+          ) : null}
           {tab === "audit" ? (
             <AuditLogTab workspaceId={workspace.id} />
           ) : null}
@@ -293,7 +303,6 @@ function WorkspaceTab({
           : "Settings for this team workspace."
       }
     >
-      {/* Avatar */}
       <div className="flex items-center gap-4">
         <Avatar className="size-16 border border-border">
           {workspace.avatar_url ? (
@@ -463,124 +472,217 @@ function NotificationsTab({
   );
 }
 
-/* -------- Integrations (stub for upcoming features) -------- */
+/* -------- Plan & billing -------- */
 
-function IntegrationsTab() {
-  // Curated set of upcoming connectors. Each renders as a card with a
-  // disabled "Connect" affordance + "Coming soon" pill so the surface
-  // feels real but doesn't promise anything we haven't built yet.
-  const items: Array<{
-    name: string;
-    blurb: string;
-    glyph: string;
-    soon?: boolean;
-  }> = [
-    {
-      name: "Slack",
-      blurb: "Push @-mentions and resolve events into a channel.",
-      glyph: "S",
-      soon: true,
-    },
-    {
-      name: "Linear",
-      blurb: "Convert resolved threads into Linear issues with one click.",
-      glyph: "L",
-      soon: true,
-    },
-    {
-      name: "Figma",
-      blurb: "Embed Beam pins on top of any Figma frame.",
-      glyph: "F",
-      soon: true,
-    },
-    {
-      name: "Zapier",
-      blurb: "Trigger zaps from any approve / status-change event.",
-      glyph: "Z",
-      soon: true,
-    },
-  ];
+const PLAN_LIMITS: Record<Plan, { markups: number | null; seats: number; price: string; features: string[] }> = {
+  free: {
+    markups: 5,
+    seats: 3,
+    price: "$0",
+    features: [
+      "Up to 5 active MarkUps",
+      "3 collaborators",
+      "Image, PDF & website review",
+      "Public share links",
+    ],
+  },
+  pro: {
+    markups: null,
+    seats: 10,
+    price: "$19",
+    features: [
+      "Unlimited MarkUps",
+      "10 collaborators",
+      "Version history & approvals",
+      "Realtime cursors",
+      "Priority email support",
+    ],
+  },
+  team: {
+    markups: null,
+    seats: 50,
+    price: "$49",
+    features: [
+      "Everything in Pro",
+      "50 collaborators",
+      "Audit log retention 1 year",
+      "SAML SSO (coming soon)",
+      "Dedicated success manager",
+    ],
+  },
+};
+
+function BillingTab({
+  workspace,
+  isOwner,
+  usage,
+}: {
+  workspace: SettingsViewProps["workspace"];
+  isOwner: boolean;
+  usage: SettingsViewProps["usage"];
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState<Plan | null>(null);
+  const limits = PLAN_LIMITS[workspace.plan];
+  const markupsPct =
+    limits.markups == null
+      ? 0
+      : Math.min(100, Math.round((usage.markups / limits.markups) * 100));
+  const seatsPct = Math.min(
+    100,
+    Math.round((usage.members / limits.seats) * 100),
+  );
+
+  async function upgrade(target: Plan) {
+    if (!isOwner) {
+      toast.error("Only the workspace owner can change the plan.");
+      return;
+    }
+    if (target === workspace.plan) return;
+    setBusy(target);
+    const res = await fetch(`/api/workspaces/${workspace.id}/billing`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ plan: target }),
+    });
+    setBusy(null);
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({}));
+      toast.error(error ?? "Couldn't switch plan");
+      return;
+    }
+    const json = (await res.json().catch(() => ({}))) as {
+      checkout_url?: string;
+    };
+    if (json.checkout_url) {
+      window.location.href = json.checkout_url;
+      return;
+    }
+    toast.success(`Switched to ${target.toUpperCase()}`);
+    router.refresh();
+  }
+
   return (
-    <Card
-      title="Integrations"
-      description="Hook Beam into the tools your team already lives in."
-    >
-      <ul className="grid gap-3 sm:grid-cols-2">
-        {items.map((it) => (
-          <li
-            key={it.name}
-            className="flex items-start gap-3 rounded-xl border border-border bg-background p-4"
-          >
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
-              {it.glyph}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-semibold text-foreground">
-                  {it.name}
-                </p>
-                {it.soon ? (
-                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Soon
-                  </span>
-                ) : null}
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">{it.blurb}</p>
-              <button
-                type="button"
-                disabled
-                className="mt-3 rounded-md border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-muted-foreground disabled:cursor-not-allowed"
+    <div className="flex flex-col gap-5">
+      <Card
+        title={`Current plan — ${workspace.plan.toUpperCase()}`}
+        description={
+          workspace.plan_renews_at
+            ? `Renews ${new Date(workspace.plan_renews_at).toLocaleDateString()}.`
+            : "Free tier — no billing on file."
+        }
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <UsageBar
+            label="MarkUps used"
+            value={usage.markups}
+            max={limits.markups}
+            pct={markupsPct}
+          />
+          <UsageBar
+            label="Members"
+            value={usage.members}
+            max={limits.seats}
+            pct={seatsPct}
+          />
+        </div>
+      </Card>
+
+      <Card
+        title="Switch plans"
+        description="Upgrade or downgrade anytime — change applies immediately."
+      >
+        <div className="grid gap-3 md:grid-cols-3">
+          {(Object.keys(PLAN_LIMITS) as Plan[]).map((p) => {
+            const tier = PLAN_LIMITS[p];
+            const current = workspace.plan === p;
+            return (
+              <div
+                key={p}
+                className={cn(
+                  "flex flex-col gap-3 rounded-xl border bg-background p-5",
+                  current
+                    ? "border-primary ring-2 ring-primary/30"
+                    : "border-border",
+                )}
               >
-                Connect
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </Card>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {p}
+                  </p>
+                  <p className="mt-1 flex items-baseline gap-1">
+                    <span className="text-2xl font-bold text-foreground">
+                      {tier.price}
+                    </span>
+                    <span className="text-xs text-muted-foreground">/mo</span>
+                  </p>
+                </div>
+                <ul className="flex flex-1 flex-col gap-1.5 text-xs text-muted-foreground">
+                  {tier.features.map((f) => (
+                    <li key={f} className="flex items-start gap-1.5">
+                      <span className="mt-0.5 text-primary">✓</span>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Button
+                  type="button"
+                  variant={current ? "outline" : "default"}
+                  disabled={current || busy !== null || !isOwner}
+                  onClick={() => upgrade(p)}
+                >
+                  {busy === p ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : null}
+                  {current
+                    ? "Current plan"
+                    : p === "free"
+                      ? "Downgrade"
+                      : "Upgrade"}
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+        {!isOwner ? (
+          <p className="text-[11px] text-muted-foreground">
+            Only the workspace owner can change the plan.
+          </p>
+        ) : null}
+      </Card>
+    </div>
   );
 }
 
-/* -------- Webhooks (read-only placeholder) -------- */
-
-function WebhooksTab() {
+function UsageBar({
+  label,
+  value,
+  max,
+  pct,
+}: {
+  label: string;
+  value: number;
+  max: number | null;
+  pct: number;
+}) {
   return (
-    <Card
-      title="Webhooks"
-      description="Send signed POSTs to your endpoint when MarkUps move through review."
-    >
-      <div className="rounded-xl border border-dashed border-border bg-background/50 p-6 text-center">
-        <Webhook
-          className="mx-auto size-7 text-muted-foreground"
-          strokeWidth={1.25}
-        />
-        <p className="mt-3 text-sm font-semibold text-foreground">
-          No webhooks yet
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Webhook subscriptions ship in the next release. We&rsquo;ll fire on
-          <code className="mx-1 rounded bg-muted px-1 py-0.5 text-[11px] font-mono">
-            markup.approved
-          </code>
-          ,{" "}
-          <code className="mx-1 rounded bg-muted px-1 py-0.5 text-[11px] font-mono">
-            thread.resolved
-          </code>
-          , and{" "}
-          <code className="mx-1 rounded bg-muted px-1 py-0.5 text-[11px] font-mono">
-            comment.created
-          </code>
-          .
-        </p>
-        <button
-          type="button"
-          disabled
-          className="mt-4 inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground disabled:cursor-not-allowed"
-        >
-          Add endpoint
-        </button>
+    <div>
+      <div className="mb-1.5 flex items-baseline justify-between text-xs">
+        <span className="font-medium text-foreground">{label}</span>
+        <span className="tabular-nums text-muted-foreground">
+          {value} / {max ?? "∞"}
+        </span>
       </div>
-    </Card>
+      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+        <div
+          className={cn(
+            "h-full rounded-full transition-[width]",
+            pct >= 90 ? "bg-destructive" : "bg-primary",
+          )}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -761,6 +863,23 @@ function DangerTab({
       description="Irreversible actions. Take a deep breath first."
       tone="danger"
     >
+      <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 p-4">
+        <div>
+          <p className="text-sm font-semibold text-foreground">Trash</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Restore or permanently delete recently deleted MarkUps.
+          </p>
+        </div>
+        <div className="flex justify-end">
+          <Button asChild type="button" variant="outline" size="sm">
+            <Link href={`/w/${workspace.id}/trash`}>
+              <Trash2 className="size-4" />
+              Open trash
+            </Link>
+          </Button>
+        </div>
+      </div>
+
       {!isOwner ? (
         <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 p-4">
           <div>

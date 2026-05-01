@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useFolders } from "@/components/workspace/folders-context";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/types/database";
 
@@ -178,7 +179,7 @@ export function MarkupGrid({ markups, workspaceId }: MarkupGridProps) {
       toast.error("Delete failed");
       return;
     }
-    toast.success(`${arr.length - failed} deleted`);
+    toast.success(`${arr.length - failed} moved to trash`);
     setDeleteOpen(false);
     clear();
     router.refresh();
@@ -192,6 +193,7 @@ export function MarkupGrid({ markups, workspaceId }: MarkupGridProps) {
 
   return (
     <>
+      <PullToRefreshIndicator onRefresh={() => router.refresh()} />
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {markups.map((m) => {
           if (!m.id) return null;
@@ -378,6 +380,36 @@ export function MarkupGrid({ markups, workspaceId }: MarkupGridProps) {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function PullToRefreshIndicator({
+  onRefresh,
+}: {
+  onRefresh: () => Promise<void> | void;
+}) {
+  const { pulling, progress } = usePullToRefresh(onRefresh);
+  if (!pulling && progress === 0) return null;
+  return (
+    <div
+      className="pointer-events-none fixed inset-x-0 top-0 z-40 flex justify-center transition-transform"
+      style={{
+        transform: `translateY(${Math.min(40, progress * 40)}px)`,
+        opacity: progress,
+      }}
+    >
+      <div className="flex size-9 items-center justify-center rounded-full border border-border bg-card shadow-md">
+        <Loader2
+          className={cn(
+            "size-4 text-primary",
+            progress >= 1 ? "animate-spin" : "",
+          )}
+          style={{
+            transform: `rotate(${progress * 360}deg)`,
+          }}
+        />
+      </div>
+    </div>
   );
 }
 

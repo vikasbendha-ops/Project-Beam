@@ -21,28 +21,52 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
 
   const { data: workspace } = await supabase
     .from("workspaces")
-    .select("id, name, owner_id, is_personal, avatar_url")
+    .select(
+      "id, name, owner_id, is_personal, avatar_url, plan, plan_seats, plan_renews_at",
+    )
     .eq("id", workspaceId)
     .maybeSingle();
   if (!workspace) notFound();
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, name, email, avatar_url, timezone")
-    .eq("id", user.id)
-    .maybeSingle();
+  const [{ data: profile }, { data: prefs }, { count: markupCount }, { count: memberCount }] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, name, email, avatar_url, timezone")
+        .eq("id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("notification_preferences")
+        .select(
+          "email_digest_frequency, markup_notifications_default, browser_push_enabled",
+        )
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("markups")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", workspaceId)
+        .is("deleted_at", null),
+      supabase
+        .from("workspace_members")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", workspaceId),
+    ]);
 
-  const { data: prefs } = await supabase
-    .from("notification_preferences")
-    .select(
-      "email_digest_frequency, markup_notifications_default, browser_push_enabled",
-    )
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const plan = (workspace.plan ?? "free") as "free" | "pro" | "team";
 
   return (
     <SettingsView
-      workspace={workspace}
+      workspace={{
+        id: workspace.id,
+        name: workspace.name,
+        owner_id: workspace.owner_id,
+        is_personal: workspace.is_personal,
+        avatar_url: workspace.avatar_url,
+        plan,
+        plan_seats: workspace.plan_seats ?? 3,
+        plan_renews_at: workspace.plan_renews_at ?? null,
+      }}
       profile={
         profile ?? {
           id: user.id,
@@ -60,6 +84,10 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
         }
       }
       isOwner={workspace.owner_id === user.id}
+      usage={{
+        markups: markupCount ?? 0,
+        members: memberCount ?? 0,
+      }}
     />
   );
 }
