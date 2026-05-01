@@ -231,19 +231,45 @@ function BuiltForTeams() {
       icon: PenTool,
       kicker: "Designers",
       title: "Pixel-perfect feedback",
-      body: "Stop guessing where the client means. Exact annotations on your mockups.",
+      body: "Stop guessing where the client means. Exact annotations on your mockups and prototypes.",
+      Decoration: () => (
+        <div className="relative h-24 w-full overflow-hidden rounded-xl border border-border/60 bg-muted">
+          <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-primary/15" />
+          <div className="absolute left-3 top-3 flex size-5 items-center justify-center rounded-full border-2 border-card bg-primary text-[9px] font-bold text-primary-foreground shadow">
+            1
+          </div>
+          <div className="absolute right-6 bottom-3 flex size-5 items-center justify-center rounded-full border-2 border-card bg-primary text-[9px] font-bold text-primary-foreground shadow">
+            2
+          </div>
+        </div>
+      ),
     },
     {
       icon: Code2,
       kicker: "Developers",
-      title: "Static-site review",
-      body: "Drop a URL, Beam screenshots it. Pin issues directly on the rendered page.",
+      title: "Live-site markup",
+      body: "Paste any URL — Beam screenshots it and renders comments on the exact pixels you shipped.",
+      Decoration: () => (
+        <div className="flex h-24 w-full flex-col gap-2 overflow-hidden rounded-xl border border-border/60 bg-muted p-3">
+          <div className="h-2 w-3/4 rounded-full bg-foreground/10" />
+          <div className="h-2 w-1/2 rounded-full bg-foreground/10" />
+          <div className="h-2 w-full rounded-full bg-foreground/10" />
+          <div className="h-2 w-2/3 rounded-full bg-foreground/10" />
+        </div>
+      ),
     },
     {
       icon: Brush,
-      kicker: "Agencies",
-      title: "Client sign-off, faster",
-      body: "Share read-only links. Clients comment as guests — no signup required.",
+      kicker: "Marketing & Agencies",
+      title: "PDF & asset review",
+      body: "Collaborate on copy, campaigns, and final deliverables in one place. Guests comment without signup.",
+      Decoration: () => (
+        <div className="flex h-24 w-full items-center justify-center rounded-xl border border-border/60 bg-muted">
+          <div className="flex size-14 items-center justify-center rounded-md border border-border bg-card shadow-sm">
+            <FileTextIcon className="size-6 text-muted-foreground/70" />
+          </div>
+        </div>
+      ),
     },
   ];
 
@@ -256,23 +282,26 @@ function BuiltForTeams() {
         {teams.map((t) => (
           <div
             key={t.kicker}
-            className="rounded-2xl border border-border bg-card p-8 shadow-[0_1px_2px_rgba(28,25,23,0.04),0_4px_12px_rgba(28,25,23,0.05)]"
+            className="flex h-80 flex-col justify-between rounded-2xl border border-border bg-card p-8 shadow-[0_1px_2px_rgba(28,25,23,0.04),0_4px_12px_rgba(28,25,23,0.05)] transition-colors hover:border-primary/30"
           >
-            <div className="mb-4 flex items-center gap-2">
-              <t.icon
-                className="size-4 text-primary"
-                strokeWidth={1.5}
-              />
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {t.kicker}
-              </span>
+            <div>
+              <div className="mb-4 flex items-center gap-2">
+                <t.icon
+                  className="size-4 text-primary"
+                  strokeWidth={1.5}
+                />
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t.kicker}
+                </span>
+              </div>
+              <h3 className="text-lg font-semibold text-foreground">
+                {t.title}
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                {t.body}
+              </p>
             </div>
-            <h3 className="text-lg font-semibold text-foreground">
-              {t.title}
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              {t.body}
-            </p>
+            <t.Decoration />
           </div>
         ))}
       </div>
@@ -282,23 +311,27 @@ function BuiltForTeams() {
 
 function CTA() {
   return (
-    <section className="bg-primary py-20 text-primary-foreground">
-      <div className="mx-auto max-w-3xl px-6 text-center">
-        <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-          Ready to ship feedback faster?
-        </h2>
-        <p className="mt-4 text-base leading-relaxed text-primary-foreground/80">
-          Sign up in 30 seconds. Personal workspace ready instantly.
-        </p>
-        <div className="mt-8">
-          <Button
-            asChild
-            size="lg"
-            variant="secondary"
-            className="bg-card text-primary hover:bg-card/90"
-          >
-            <Link href="/signup">Create your workspace</Link>
-          </Button>
+    <section className="mx-auto max-w-7xl px-6 py-24 lg:px-8">
+      <div className="relative overflow-hidden rounded-3xl border border-primary/15 bg-[#EEF2FF] p-12 text-center sm:p-16">
+        {/* Decorative blurs */}
+        <div className="pointer-events-none absolute right-0 top-0 size-64 -translate-y-1/2 translate-x-1/2 rounded-full bg-primary/15 blur-3xl" />
+        <div className="pointer-events-none absolute bottom-0 left-0 size-64 translate-y-1/2 -translate-x-1/2 rounded-full bg-sky-300/30 blur-3xl" />
+        <div className="relative z-10 mx-auto max-w-2xl">
+          <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+            Ready to ship feedback faster?
+          </h2>
+          <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+            Sign up in 30 seconds. Personal workspace ready instantly. No
+            credit card. No bots.
+          </p>
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Button asChild size="lg" className="shadow-md">
+              <Link href="/signup">Get started for free</Link>
+            </Button>
+            <Button asChild size="lg" variant="outline">
+              <Link href="/login">I already have an account</Link>
+            </Button>
+          </div>
         </div>
       </div>
     </section>
@@ -307,24 +340,47 @@ function CTA() {
 
 function SiteFooter() {
   return (
-    <footer className="border-t border-border bg-background py-10">
-      <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-4 px-6 text-sm text-muted-foreground sm:flex-row">
-        <div className="flex items-center gap-2">
-          <BeamWordmark className="text-base" />
-          <span className="hidden sm:inline">·</span>
-          <span className="hidden sm:inline">
-            Faster feedback on websites, images, and PDFs.
-          </span>
-        </div>
-        <div className="flex items-center gap-5">
-          <Link href="/login" className="hover:text-foreground">
+    <footer className="border-t border-border bg-card py-12">
+      <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-6 px-6 sm:flex-row">
+        <BeamWordmark className="text-base" />
+        <div className="flex items-center gap-6 text-sm text-muted-foreground">
+          <Link href="/login" className="transition-colors hover:text-foreground">
             Log in
           </Link>
-          <Link href="/signup" className="hover:text-foreground">
+          <Link href="/signup" className="transition-colors hover:text-foreground">
             Sign up
           </Link>
+          <Link href="#" className="transition-colors hover:text-foreground">
+            Privacy
+          </Link>
+          <Link href="#" className="transition-colors hover:text-foreground">
+            Terms
+          </Link>
         </div>
+        <p className="text-xs text-muted-foreground/70">
+          © {new Date().getFullYear()} Beam. All rights reserved.
+        </p>
       </div>
     </footer>
+  );
+}
+
+function FileTextIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+      <path d="M14 3v6h6" />
+      <path d="M9 13h6" />
+      <path d="M9 17h6" />
+    </svg>
   );
 }

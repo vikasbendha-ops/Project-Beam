@@ -26,6 +26,15 @@ interface PdfCanvasProps {
   /** Fires once when page 1's bitmap finishes rendering. Used to capture
    *  a thumbnail for the dashboard / sibling rail. */
   onFirstPageRendered?: (canvas: HTMLCanvasElement) => void;
+  /** Drag-to-reposition handler. Receives the destination page number so
+   *  pins can move between pages if released over a different one (the
+   *  caller will scope this to the page where the pointer is released). */
+  onMovePin?: (
+    threadId: string,
+    x: number,
+    y: number,
+    pageNumber?: number | null,
+  ) => void;
 }
 
 interface PageMeta {
@@ -41,6 +50,7 @@ export function PdfCanvas({
   threads,
   renderOverlay,
   onFirstPageRendered,
+  onMovePin,
 }: PdfCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -270,7 +280,13 @@ export function PdfCanvas({
                     y={Number(t.y_position)}
                     active={activeThreadId === t.id}
                     resolved={t.status === "resolved"}
+                    priority={t.priority}
                     onClick={() => setActiveThread(t.id)}
+                    onMove={
+                      onMovePin
+                        ? (x, y) => onMovePin(t.id, x, y, p.pageNumber)
+                        : undefined
+                    }
                   />
                 );
               })}

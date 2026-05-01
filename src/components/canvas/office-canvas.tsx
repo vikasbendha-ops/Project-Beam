@@ -16,6 +16,12 @@ interface OfficeCanvasProps {
   /** Page-scoped overlay slot. Office docs collapse to a single page so
    *  this is always called with pageNumber=1. */
   renderOverlay?: (pageNumber: number) => React.ReactNode;
+  onMovePin?: (
+    threadId: string,
+    x: number,
+    y: number,
+    pageNumber?: number | null,
+  ) => void;
 }
 
 /**
@@ -33,6 +39,7 @@ export function OfficeCanvas({
   fileName,
   threads,
   renderOverlay,
+  onMovePin,
 }: OfficeCanvasProps) {
   const mode = useCanvasStore((s) => s.mode);
   const activeThreadId = useCanvasStore((s) => s.activeThreadId);
@@ -136,7 +143,13 @@ export function OfficeCanvas({
                 y={Number(t.y_position)}
                 active={activeThreadId === t.id}
                 resolved={t.status === "resolved"}
+                priority={t.priority}
                 onClick={() => setActiveThread(t.id)}
+                onMove={
+                  onMovePin
+                    ? (x, y) => onMovePin(t.id, x, y, 1)
+                    : undefined
+                }
               />
             );
           })}

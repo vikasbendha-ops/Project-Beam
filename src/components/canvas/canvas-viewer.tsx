@@ -108,7 +108,7 @@ function CanvasViewerInner({
   const activeThreadId = useCanvasStore((s) => s.activeThreadId);
   const pendingPin = useCanvasStore((s) => s.pendingPin);
   const sidebarCollapsed = useCanvasStore((s) => s.sidebarCollapsed);
-  const { threads } = useCanvasMutators();
+  const { threads, moveThread } = useCanvasMutators();
 
   const activeThread = activeThreadId
     ? threads.find((t) => t.id === activeThreadId) ?? null
@@ -202,6 +202,9 @@ function CanvasViewerInner({
               fileName={version?.file_name}
               threads={threads}
               renderOverlay={renderOverlay}
+              onMovePin={(id, x, y, page) =>
+                void moveThread(id, x, y, page ?? 1)
+              }
             />
           ) : isDocument && docCategory === "text" ? (
             <TextCanvas
@@ -209,6 +212,9 @@ function CanvasViewerInner({
               mime={version?.mime_type}
               threads={threads}
               renderOverlay={renderOverlay}
+              onMovePin={(id, x, y, page) =>
+                void moveThread(id, x, y, page ?? 1)
+              }
             />
           ) : isDocument ? (
             <PdfCanvas
@@ -216,6 +222,9 @@ function CanvasViewerInner({
               threads={threads}
               renderOverlay={renderOverlay}
               onFirstPageRendered={onPdfFirstRendered}
+              onMovePin={(id, x, y, page) =>
+                void moveThread(id, x, y, page ?? 1)
+              }
             />
           ) : (
             <ImageCanvas
@@ -224,6 +233,7 @@ function CanvasViewerInner({
               threads={threads}
               pinSize={isMobile ? 32 : 28}
               renderOverlay={renderOverlay}
+              onMovePin={(id, x, y) => void moveThread(id, x, y, 1)}
             />
           )}
           <ZoomControls />

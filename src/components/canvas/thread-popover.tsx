@@ -5,6 +5,7 @@ import { formatDistanceToNow } from "date-fns";
 import {
   CheckCircle2,
   Circle,
+  Flag,
   MoreHorizontal,
   Trash2,
   X,
@@ -15,6 +16,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -43,7 +45,8 @@ export function ThreadPopover({
   const isMobile = useIsMobile();
   const [working, setWorking] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const { postReply, setThreadStatus, deleteThread } = useCanvasMutators();
+  const { postReply, setThreadStatus, setThreadPriority, deleteThread } =
+    useCanvasMutators();
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -162,7 +165,7 @@ export function ThreadPopover({
               >
                 <MoreHorizontal className="size-4" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuContent align="end" className="w-52">
                 <DropdownMenuItem onSelect={toggleResolve} disabled={working}>
                   {thread.status === "resolved" ? (
                     <>
@@ -174,6 +177,40 @@ export function ThreadPopover({
                     </>
                   )}
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Priority
+                </DropdownMenuLabel>
+                {(
+                  ["none", "low", "medium", "high"] as const
+                ).map((p) => (
+                  <DropdownMenuItem
+                    key={p}
+                    onSelect={() => void setThreadPriority(thread.id, p)}
+                    disabled={working || thread.priority === p}
+                    className="capitalize"
+                  >
+                    <Flag
+                      className={
+                        p === "high"
+                          ? "size-4 text-red-500"
+                          : p === "medium"
+                            ? "size-4 text-amber-500"
+                            : p === "low"
+                              ? "size-4 text-sky-500"
+                              : "size-4 text-muted-foreground"
+                      }
+                      fill={p !== "none" ? "currentColor" : "none"}
+                      strokeWidth={p === "none" ? 1.5 : 0}
+                    />
+                    {p === "none" ? "No priority" : `${p}`}
+                    {thread.priority === p ? (
+                      <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        ✓
+                      </span>
+                    ) : null}
+                  </DropdownMenuItem>
+                ))}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   variant="destructive"

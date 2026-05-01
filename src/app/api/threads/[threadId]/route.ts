@@ -27,11 +27,20 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
   const updates: {
     status?: "open" | "resolved";
     priority?: "none" | "low" | "medium" | "high";
+    x_position?: number;
+    y_position?: number;
+    page_number?: number | null;
     resolved_at?: string | null;
     resolved_by?: string | null;
   } = {};
   if (parsed.data.priority !== undefined)
     updates.priority = parsed.data.priority;
+  if (parsed.data.x_position !== undefined)
+    updates.x_position = parsed.data.x_position;
+  if (parsed.data.y_position !== undefined)
+    updates.y_position = parsed.data.y_position;
+  if (parsed.data.page_number !== undefined)
+    updates.page_number = parsed.data.page_number;
   if (parsed.data.status !== undefined) {
     updates.status = parsed.data.status;
     if (parsed.data.status === "resolved") {

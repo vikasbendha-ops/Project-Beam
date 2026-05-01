@@ -15,6 +15,14 @@ interface ImageCanvasProps {
    *  Receives the page number so the same prop can be reused by PDF (which
    *  renders one overlay per page). For images, always called with 1. */
   renderOverlay?: (pageNumber: number) => React.ReactNode;
+  /** When provided, pins become draggable. Receives the new % coords on
+   *  release. The 4th arg is page number (always 1 for images). */
+  onMovePin?: (
+    threadId: string,
+    x: number,
+    y: number,
+    pageNumber?: number | null,
+  ) => void;
 }
 
 /**
@@ -40,6 +48,7 @@ export function ImageCanvas({
   threads,
   pinSize = 28,
   renderOverlay,
+  onMovePin,
 }: ImageCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -290,8 +299,14 @@ export function ImageCanvas({
                     y={Number(t.y_position)}
                     active={activeThreadId === t.id}
                     resolved={t.status === "resolved"}
+                    priority={t.priority}
                     size={pinSize}
                     onClick={() => setActiveThread(t.id)}
+                    onMove={
+                      onMovePin
+                        ? (x, y) => onMovePin(t.id, x, y, 1)
+                        : undefined
+                    }
                     previewText={firstMessage?.content ?? undefined}
                     replyCount={replyCount}
                   />

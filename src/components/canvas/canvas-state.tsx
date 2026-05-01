@@ -111,6 +111,17 @@ interface CanvasMutators {
     threadId: string,
     status: "open" | "resolved",
   ) => Promise<void>;
+  setThreadPriority: (
+    threadId: string,
+    priority: "none" | "low" | "medium" | "high",
+  ) => Promise<void>;
+  /** Reposition pin to new % coords (and optionally a different page). */
+  moveThread: (
+    threadId: string,
+    x: number,
+    y: number,
+    pageNumber?: number | null,
+  ) => Promise<void>;
   deleteThread: (threadId: string) => Promise<void>;
   deleteMessage: (threadId: string, messageId: string) => Promise<void>;
 }
@@ -421,6 +432,90 @@ export function CanvasStateProvider({
     [threads],
   );
 
+  const setThreadPriority = useCallback(
+    async (
+      threadId: string,
+      priority: "none" | "low" | "medium" | "high",
+    ) => {
+      const target = threads.find((t) => t.id === threadId);
+      if (!target) return;
+      dispatch({
+        type: "UPDATE_THREAD",
+        threadId,
+        patch: { priority },
+      });
+      try {
+        const res = await fetch(`/api/threads/${threadId}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ priority }),
+        });
+        if (!res.ok) {
+          const { error } = await res.json().catch(() => ({}));
+          throw new Error(error ?? "Couldn't update priority");
+        }
+      } catch (err) {
+        dispatch({
+          type: "UPDATE_THREAD",
+          threadId,
+          patch: { priority: target.priority },
+        });
+        toast.error(err instanceof Error ? err.message : "Couldn't update");
+      }
+    },
+    [threads],
+  );
+
+  const moveThread = useCallback(
+    async (
+      threadId: string,
+      x: number,
+      y: number,
+      pageNumber?: number | null,
+    ) => {
+      const target = threads.find((t) => t.id === threadId);
+      if (!target) return;
+      // Optimistic.
+      dispatch({
+        type: "UPDATE_THREAD",
+        threadId,
+        patch: {
+          x_position: x,
+          y_position: y,
+          ...(pageNumber !== undefined ? { page_number: pageNumber } : {}),
+        },
+      });
+      try {
+        const res = await fetch(`/api/threads/${threadId}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            x_position: x,
+            y_position: y,
+            ...(pageNumber !== undefined ? { page_number: pageNumber } : {}),
+          }),
+        });
+        if (!res.ok) {
+          const { error } = await res.json().catch(() => ({}));
+          throw new Error(error ?? "Couldn't move pin");
+        }
+      } catch (err) {
+        // Revert.
+        dispatch({
+          type: "UPDATE_THREAD",
+          threadId,
+          patch: {
+            x_position: target.x_position,
+            y_position: target.y_position,
+            page_number: target.page_number,
+          },
+        });
+        toast.error(err instanceof Error ? err.message : "Couldn't move pin");
+      }
+    },
+    [threads],
+  );
+
   const deleteThread = useCallback(
     async (threadId: string) => {
       const target = threads.find((t) => t.id === threadId);
@@ -471,10 +566,21 @@ export function CanvasStateProvider({
       createThread,
       postReply,
       setThreadStatus,
+      setThreadPriority,
+      moveThread,
       deleteThread,
       deleteMessage,
     }),
-    [threads, createThread, postReply, setThreadStatus, deleteThread, deleteMessage],
+    [
+      threads,
+      createThread,
+      postReply,
+      setThreadStatus,
+      setThreadPriority,
+      moveThread,
+      deleteThread,
+      deleteMessage,
+    ],
   );
 
   return (

@@ -14,6 +14,12 @@ interface TextCanvasProps {
   threads: CanvasThread[];
   /** Page-scoped overlay slot. Text files have one page; always 1. */
   renderOverlay?: (pageNumber: number) => React.ReactNode;
+  onMovePin?: (
+    threadId: string,
+    x: number,
+    y: number,
+    pageNumber?: number | null,
+  ) => void;
 }
 
 /**
@@ -29,6 +35,7 @@ export function TextCanvas({
   mime,
   threads,
   renderOverlay,
+  onMovePin,
 }: TextCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [text, setText] = useState<string | null>(null);
@@ -128,7 +135,13 @@ export function TextCanvas({
             y={Number(t.y_position)}
             active={activeThreadId === t.id}
             resolved={t.status === "resolved"}
+            priority={t.priority}
             onClick={() => setActiveThread(t.id)}
+            onMove={
+              onMovePin
+                ? (x, y) => onMovePin(t.id, x, y, 1)
+                : undefined
+            }
           />
         );
       })}

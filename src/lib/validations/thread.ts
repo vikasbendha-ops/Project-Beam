@@ -32,6 +32,11 @@ export const patchThreadSchema = z
   .object({
     status: z.enum(["open", "resolved"]).optional(),
     priority: z.enum(["none", "low", "medium", "high"]).optional(),
+    /** Drag-to-reposition: % of canvas / page wrapper. */
+    x_position: z.number().min(0).max(100).optional(),
+    y_position: z.number().min(0).max(100).optional(),
+    /** PDF page where the pin lives — only meaningful for paginated docs. */
+    page_number: z.number().int().positive().nullable().optional(),
   })
   .strict();
 
