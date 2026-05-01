@@ -11,6 +11,8 @@ interface VersionsPageProps {
   params: Promise<{ workspaceId: string; markupId: string }>;
 }
 
+const ONE_DAY = 60 * 60 * 24;
+
 export default async function VersionsPage({ params }: VersionsPageProps) {
   const { workspaceId, markupId } = await params;
   const supabase = await createClient();
@@ -35,8 +37,29 @@ export default async function VersionsPage({ params }: VersionsPageProps) {
     .eq("markup_id", markupId)
     .order("version_number", { ascending: false });
 
+  // Pre-sign each version's file URL so the preview pane can render the
+  // actual document — not just metadata. 24h TTL = browser cache hits across
+  // selections + page reloads. Website screenshots already store an https://
+  // URL in `file_url` (Supabase `screenshots` bucket signed by the Apify
+  // webhook); skip re-signing those.
+  const bucket = markup.type === "website" ? "screenshots" : "markup-files";
+  const versionsWithUrls = await Promise.all(
+    (versions ?? []).map(async (v) => {
+      if (!v.file_url) return { ...v, signed_url: null };
+      if (v.file_url.startsWith("http")) {
+        return { ...v, signed_url: v.file_url };
+      }
+      const { data } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(v.file_url, ONE_DAY);
+      return { ...v, signed_url: data?.signedUrl ?? null };
+    }),
+  );
+
   const uploaderIds = Array.from(
-    new Set((versions ?? []).map((v) => v.uploaded_by).filter(Boolean) as string[]),
+    new Set(
+      (versions ?? []).map((v) => v.uploaded_by).filter(Boolean) as string[],
+    ),
   );
   const { data: profiles } = uploaderIds.length
     ? await supabase
@@ -54,7 +77,7 @@ export default async function VersionsPage({ params }: VersionsPageProps) {
     <VersionHistoryView
       markup={{ id: markup.id, title: markup.title, type: markup.type }}
       workspaceId={workspaceId}
-      versions={versions ?? []}
+      versions={versionsWithUrls}
       profiles={profiles ?? []}
       threadCountsByVersion={(threadCounts ?? []).reduce<
         Record<string, number>

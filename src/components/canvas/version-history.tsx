@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
+  Columns2,
   FileText,
   History,
   Loader2,
@@ -16,11 +17,13 @@ import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { VersionPreview } from "@/components/canvas/version-preview";
 import { MAX_UPLOAD_BYTES } from "@/lib/constants";
+import { ACCEPTED_UPLOAD_MIMES, type AcceptedMime } from "@/lib/mime";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/types/database";
 
-type Version = Pick<
+type VersionRow = Pick<
   Database["public"]["Tables"]["markup_versions"]["Row"],
   | "id"
   | "version_number"
@@ -33,6 +36,10 @@ type Version = Pick<
   | "is_current"
   | "created_at"
 >;
+
+/** Each row arrives with an already-signed URL so the preview pane can
+ *  render the document without another network round-trip. */
+export type Version = VersionRow & { signed_url: string | null };
 
 interface VersionHistoryViewProps {
   workspaceId: string;
@@ -47,14 +54,7 @@ interface VersionHistoryViewProps {
   threadCountsByVersion: Record<string, number>;
 }
 
-const ALLOWED_MIMES = [
-  "image/png",
-  "image/jpeg",
-  "image/gif",
-  "image/webp",
-  "image/svg+xml",
-  "application/pdf",
-];
+const ALLOWED_MIMES = ACCEPTED_UPLOAD_MIMES;
 
 export function VersionHistoryView({
   workspaceId,
@@ -80,10 +80,16 @@ export function VersionHistoryView({
   );
   const selected =
     versions.find((v) => v.id === selectedId) ?? current ?? null;
+  const [compareMode, setCompareMode] = useState(false);
+  // Compare only makes sense with two distinct versions.
+  const canCompare =
+    versions.length > 1 && selected && current && selected.id !== current.id;
 
   async function handleUpload(file: File) {
-    if (!ALLOWED_MIMES.includes(file.type)) {
-      toast.error("Unsupported file type");
+    if (!ALLOWED_MIMES.includes(file.type as AcceptedMime)) {
+      toast.error(
+        "Unsupported file. Allowed: images, PDF, Word, Excel, PowerPoint, plain text.",
+      );
       return;
     }
     if (file.size > MAX_UPLOAD_BYTES) {
@@ -208,6 +214,18 @@ export function VersionHistoryView({
           </div>
         </Link>
         <div className="flex items-center gap-2">
+          {canCompare ? (
+            <Button
+              type="button"
+              variant={compareMode ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setCompareMode((v) => !v)}
+              aria-pressed={compareMode}
+            >
+              <Columns2 className="size-4" />
+              {compareMode ? "Hide compare" : "Compare with current"}
+            </Button>
+          ) : null}
           {selected && !selected.is_current ? (
             <Button
               type="button"
@@ -344,53 +362,42 @@ export function VersionHistoryView({
           </ul>
         </aside>
 
-        <main className="flex flex-1 flex-col overflow-y-auto bg-muted p-6">
+        <main className="flex flex-1 flex-col overflow-hidden bg-muted">
           {!selected ? (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
               Pick a version on the left to inspect it.
             </div>
           ) : (
-            <div className="mx-auto w-full max-w-3xl space-y-4">
-              <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h2 className="text-lg font-bold text-foreground">
-                      v{selected.version_number}
-                      {selected.is_current ? (
-                        <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-primary">
-                          Current
-                        </span>
-                      ) : null}
-                    </h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {selected.file_name ?? "—"} ·{" "}
-                      {selected.file_size
-                        ? formatBytes(selected.file_size)
-                        : "—"}{" "}
-                      ·{" "}
-                      {selected.created_at
-                        ? format(
-                            new Date(selected.created_at),
-                            "MMM d, yyyy 'at' h:mm a",
-                          )
-                        : "—"}
-                    </p>
-                  </div>
-                  {!selected.is_current ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => deleteVersion(selected.id)}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="size-4" />
-                      Delete
-                    </Button>
-                  ) : null}
+            <>
+              <PreviewHeader
+                selected={selected}
+                onDelete={() => deleteVersion(selected.id)}
+              />
+              {compareMode && canCompare && current ? (
+                <div className="grid flex-1 grid-cols-1 overflow-hidden md:grid-cols-2">
+                  <PreviewPane
+                    label={`v${selected.version_number}${
+                      selected.is_current ? " · Current" : ""
+                    }`}
+                    side="left"
+                    version={selected}
+                  />
+                  <PreviewPane
+                    label={`v${current.version_number} · Current`}
+                    side="right"
+                    version={current}
+                  />
                 </div>
-              </div>
-            </div>
+              ) : (
+                <div className="flex flex-1 overflow-hidden">
+                  <VersionPreview
+                    url={selected.signed_url}
+                    mime={selected.mime_type}
+                    fileName={selected.file_name}
+                  />
+                </div>
+              )}
+            </>
           )}
         </main>
       </div>
@@ -402,4 +409,82 @@ function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/** Strip above the preview area: file name + size + date, plus a Delete
+ *  affordance for non-current versions. The actual preview lives below. */
+function PreviewHeader({
+  selected,
+  onDelete,
+}: {
+  selected: Version;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border bg-card px-6 py-4">
+      <div>
+        <h2 className="flex items-center gap-2 text-base font-bold text-foreground">
+          v{selected.version_number}
+          {selected.is_current ? (
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+              Current
+            </span>
+          ) : null}
+        </h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {selected.file_name ?? "—"} ·{" "}
+          {selected.file_size ? formatBytes(selected.file_size) : "—"} ·{" "}
+          {selected.created_at
+            ? format(
+                new Date(selected.created_at),
+                "MMM d, yyyy 'at' h:mm a",
+              )
+            : "—"}
+        </p>
+      </div>
+      {!selected.is_current ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onDelete}
+          className="text-muted-foreground hover:text-destructive"
+        >
+          <Trash2 className="size-4" />
+          Delete
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+/** Side-by-side compare cell: a small caption above the rendered version. */
+function PreviewPane({
+  label,
+  side,
+  version,
+}: {
+  label: string;
+  side: "left" | "right";
+  version: Version;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex h-full min-h-0 flex-col overflow-hidden",
+        side === "left" ? "border-r border-border" : null,
+      )}
+    >
+      <div className="shrink-0 border-b border-border bg-card/80 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur">
+        {label}
+      </div>
+      <div className="relative flex-1 overflow-hidden">
+        <VersionPreview
+          url={version.signed_url}
+          mime={version.mime_type}
+          fileName={version.file_name}
+        />
+      </div>
+    </div>
+  );
 }
