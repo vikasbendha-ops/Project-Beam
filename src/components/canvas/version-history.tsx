@@ -9,6 +9,7 @@ import {
   FileText,
   History,
   Loader2,
+  Menu,
   MessageSquare,
   Trash2,
   Upload,
@@ -20,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { VersionPreview } from "@/components/canvas/version-preview";
 import { MAX_UPLOAD_BYTES } from "@/lib/constants";
 import { ACCEPTED_UPLOAD_MIMES, type AcceptedMime } from "@/lib/mime";
+import { useUIStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/types/database";
 
@@ -67,6 +69,8 @@ export function VersionHistoryView({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const focusMenuOpen = useUIStore((s) => s.focusMenuOpen);
+  const setFocusMenuOpen = useUIStore((s) => s.setFocusMenuOpen);
   const profileMap = profiles.reduce<Record<string, (typeof profiles)[0]>>(
     (acc, p) => {
       acc[p.id] = p;
@@ -199,20 +203,35 @@ export function VersionHistoryView({
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
       <header className="z-10 flex h-16 shrink-0 items-center justify-between border-b border-border bg-card px-4 shadow-sm md:px-6">
-        <Link
-          href={`/w/${workspaceId}/markup/${markup.id}`}
-          className="flex items-center gap-3 text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="size-5" />
-          <div className="flex flex-col">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-              {markup.title}
-            </span>
-            <span className="text-base font-semibold text-foreground">
-              Version history
-            </span>
-          </div>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => setFocusMenuOpen(!focusMenuOpen)}
+            aria-label={
+              focusMenuOpen ? "Close workspace menu" : "Open workspace menu"
+            }
+            aria-pressed={focusMenuOpen}
+            className="hidden md:inline-flex"
+          >
+            <Menu className="size-5" />
+          </Button>
+          <Link
+            href={`/w/${workspaceId}/markup/${markup.id}`}
+            className="flex items-center gap-3 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="size-5" />
+            <div className="flex flex-col">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                {markup.title}
+              </span>
+              <span className="text-base font-semibold text-foreground">
+                Version history
+              </span>
+            </div>
+          </Link>
+        </div>
         <div className="flex items-center gap-2">
           {canCompare ? (
             <Button

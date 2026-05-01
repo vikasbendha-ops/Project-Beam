@@ -9,6 +9,7 @@ import {
   ChevronRight,
   ExternalLink,
   History,
+  Menu,
   MessageSquarePlus,
   MousePointer2,
   PanelLeft,
@@ -20,6 +21,7 @@ import { ShareModal } from "@/components/canvas/share-modal";
 import { ShortcutsHelp } from "@/components/canvas/shortcuts-help";
 import { StatusMenu } from "@/components/canvas/status-menu";
 import { useCanvasStore } from "@/stores/canvas-store";
+import { useUIStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 import type { MarkupStatus } from "@/components/canvas/types";
 import type {
@@ -49,6 +51,8 @@ export function CanvasTopBar({
   const setMode = useCanvasStore((s) => s.setMode);
   const sidebarCollapsed = useCanvasStore((s) => s.sidebarCollapsed);
   const setSidebarCollapsed = useCanvasStore((s) => s.setSidebarCollapsed);
+  const focusMenuOpen = useUIStore((s) => s.focusMenuOpen);
+  const setFocusMenuOpen = useUIStore((s) => s.setFocusMenuOpen);
   const [shareOpen, setShareOpen] = useState(false);
   const canApprove = currentUser.role !== "guest";
   const canShare = currentUser.role !== "guest";
@@ -131,6 +135,17 @@ export function CanvasTopBar({
   return (
     <header className="z-20 flex h-16 shrink-0 items-center justify-between border-b border-border bg-card px-3 shadow-sm md:px-4">
       <div className="flex min-w-0 items-center gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => setFocusMenuOpen(!focusMenuOpen)}
+          aria-label={focusMenuOpen ? "Close workspace menu" : "Open workspace menu"}
+          aria-pressed={focusMenuOpen}
+          className="hidden md:inline-flex"
+        >
+          <Menu className="size-5" />
+        </Button>
         <Button
           asChild
           type="button"

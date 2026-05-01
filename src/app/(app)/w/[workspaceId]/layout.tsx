@@ -4,6 +4,7 @@ import { TopNav } from "@/components/workspace/top-nav";
 import { MobileDrawer } from "@/components/workspace/mobile-drawer";
 import { NewMarkupModal } from "@/components/workspace/new-markup-modal";
 import { FoldersProvider } from "@/components/workspace/folders-context";
+import { AppShell } from "@/components/workspace/app-shell";
 import { createClient } from "@/lib/supabase/server";
 import { buildFolderTree } from "@/lib/folders";
 import type { WorkspaceSummary } from "@/components/workspace/workspace-switcher";
@@ -100,19 +101,16 @@ export default async function WorkspaceLayout({
 
   return (
     <FoldersProvider folders={folders}>
-      <div className="flex min-h-screen bg-background">
-        <Sidebar
-          current={current}
-          workspaces={workspaces}
-          folders={folders}
-          className="hidden md:flex"
-        />
-        <MobileDrawer
-          current={current}
-          workspaces={workspaces}
-          folders={folders}
-        />
-        <div className="flex min-w-0 flex-1 flex-col">
+      <AppShell
+        sidebar={
+          <Sidebar
+            current={current}
+            workspaces={workspaces}
+            folders={folders}
+            className="hidden h-full w-full md:flex"
+          />
+        }
+        topNav={
           <TopNav
             workspaceId={workspace.id}
             user={{
@@ -122,10 +120,18 @@ export default async function WorkspaceLayout({
             }}
             unreadCount={unreadCount ?? 0}
           />
-          <main className="flex-1">{children}</main>
-        </div>
-        <NewMarkupModal workspaceId={workspace.id} />
-      </div>
+        }
+        mobileDrawer={
+          <MobileDrawer
+            current={current}
+            workspaces={workspaces}
+            folders={folders}
+          />
+        }
+        modals={<NewMarkupModal workspaceId={workspace.id} />}
+      >
+        {children}
+      </AppShell>
     </FoldersProvider>
   );
 }
