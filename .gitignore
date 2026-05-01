@@ -47,3 +47,6 @@ next-env.d.ts
 /public/pdf.worker.min.mjs
 /graphify-out/
 /public/pdfjs/
+
+# caveman compress backups
+*.original.md

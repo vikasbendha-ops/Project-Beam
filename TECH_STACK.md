@@ -1,6 +1,6 @@
 # BEAM — Tech Stack, File Structure, and Setup
 
-> Companion to `PROJECT_BRIEF.md`. Use this for exact dependencies, environment variables, file structure, and step-by-step setup.
+> Companion to `PROJECT_BRIEF.md`. Use for exact deps, env vars, file structure, step-by-step setup.
 
 ---
 
@@ -18,7 +18,7 @@
 | @supabase/ssr | latest |
 | shadcn/ui | latest CLI |
 
-Always run `pnpm dlx <pkg>@latest` to get the newest version. Don't pin to old versions unless you hit a known breaking change.
+Run `pnpm dlx <pkg>@latest` for newest. Don't pin old versions unless known breaking change.
 
 ---
 
@@ -61,7 +61,7 @@ form checkbox switch radio-group separator skeleton
 
 ## 3. Environment Variables
 
-Create a `.env.example` file (commit this):
+Create `.env.example` (commit):
 
 ```bash
 # Supabase — get from Supabase Dashboard → Project Settings → API
@@ -86,14 +86,14 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_APP_NAME=Beam
 ```
 
-Create `.env.local` (DO NOT commit) with real values. The user will provide:
+Create `.env.local` (DO NOT commit) with real values. User provides:
 - `NEXT_PUBLIC_SUPABASE_URL` = `https://dejxdmycijocbxuaharf.supabase.co`
 - `SUPABASE_PROJECT_REF` = `dejxdmycijocbxuaharf`
-- Anon key + service role key — fetch via Supabase CLI or ask user for them
-- `RESEND_API_KEY` — user will share separately
-- `APIFY_API_TOKEN` — user will share if pursuing website type
+- Anon key + service role key — fetch via Supabase CLI or ask user
+- `RESEND_API_KEY` — user shares separately
+- `APIFY_API_TOKEN` — user shares if pursuing website type
 
-⚠️ The `SUPABASE_ACCESS_TOKEN` is highly sensitive — only use it locally for setup. Production runtime does NOT need it.
+⚠️ `SUPABASE_ACCESS_TOKEN` highly sensitive — local setup only. Production runtime not need.
 
 ---
 
@@ -285,7 +285,7 @@ git remote add origin https://github.com/vikasbendha-ops/Project-Beam.git
 ```
 
 ### Step 2: Install dependencies
-Run all the `pnpm add` commands from Section 2.
+Run all `pnpm add` commands from Section 2.
 
 ### Step 3: Initialize shadcn/ui
 ```bash
@@ -295,24 +295,24 @@ pnpm dlx shadcn@latest init
 Then install components from Section 2.
 
 ### Step 4: Set up Supabase clients
-Create `src/lib/supabase/client.ts`, `server.ts`, `middleware.ts`, `service.ts` following the official `@supabase/ssr` patterns for Next.js App Router.
+Create `src/lib/supabase/client.ts`, `server.ts`, `middleware.ts`, `service.ts` per official `@supabase/ssr` patterns for Next.js App Router.
 
 ### Step 5: Run database schema
-Open Supabase Dashboard → SQL Editor → New Query → paste contents of `DATABASE_SCHEMA.sql` → Run.
+Supabase Dashboard → SQL Editor → New Query → paste `DATABASE_SCHEMA.sql` → Run.
 
-Verify in Table Editor that all tables exist.
+Verify all tables exist in Table Editor.
 
 ### Step 6: Generate TypeScript types from Supabase
 ```bash
 pnpm dlx supabase gen types typescript --project-id dejxdmycijocbxuaharf > src/types/database.ts
 ```
-(Requires `SUPABASE_ACCESS_TOKEN` env var to be set when running the CLI.)
+(Needs `SUPABASE_ACCESS_TOKEN` env var set when running CLI.)
 
 ### Step 7: Configure environment
-Copy `.env.example` to `.env.local`, fill in real values.
+Copy `.env.example` to `.env.local`, fill real values.
 
 ### Step 8: Add middleware for protected routes
-`middleware.ts` at project root — refresh Supabase session on every request, redirect unauthenticated users to `/login` for `/w/*` routes.
+`middleware.ts` at project root — refresh Supabase session per request, redirect unauth users to `/login` for `/w/*` routes.
 
 ### Step 9: First commit + push
 ```bash
@@ -322,7 +322,7 @@ git push -u origin main
 ```
 
 ### Step 10: Build screen by screen
-Follow the build order in `PROJECT_BRIEF.md` Section 8. Use Stitch MCP to fetch each design.
+Follow build order in `PROJECT_BRIEF.md` Section 8. Use Stitch MCP to fetch each design.
 
 ---
 
@@ -389,30 +389,30 @@ Use service client ONLY in API routes for guest comment writes.
 
 ## 8. Critical implementation notes
 
-- **PDF rendering:** use `pdfjs-dist` worker properly. Set `pdfjs.GlobalWorkerOptions.workerSrc` to the CDN URL or self-hosted worker bundle.
+- **PDF rendering:** use `pdfjs-dist` worker properly. Set `pdfjs.GlobalWorkerOptions.workerSrc` to CDN URL or self-hosted worker bundle.
 - **Realtime:** subscribe with `supabase.channel('markup-${id}').on('postgres_changes', ...)`. Unsubscribe on unmount.
-- **File uploads:** generate signed upload URLs from a server action; client uploads directly to Supabase Storage. Validate 50MB before upload starts.
-- **Pin coordinates:** store as percentages (0–100) so pins survive image resizing.
-- **Mobile bottom sheet:** use `vaul` library — supports peek/half/full snap points natively.
+- **File uploads:** generate signed upload URLs from server action; client uploads direct to Supabase Storage. Validate 50MB before upload.
+- **Pin coordinates:** store as percentages (0–100) so pins survive image resize.
+- **Mobile bottom sheet:** use `vaul` — supports peek/half/full snap points natively.
 - **Mention autocomplete:** trigger on `@` keystroke, query `profiles` table filtered by workspace members.
-- **Optimistic updates:** when posting a comment, append to UI immediately, then reconcile with server response.
-- **Image-only canvas:** use CSS `transform: scale()` for zoom + `translate()` for pan. Don't use canvas API unless drawing freehand.
-- **PDF canvas:** render each page to a `<canvas>` via pdfjs-dist, stack vertically in a scrollable container.
+- **Optimistic updates:** posting comment, append to UI immediately, reconcile with server response.
+- **Image-only canvas:** use CSS `transform: scale()` for zoom + `translate()` for pan. Skip canvas API unless drawing freehand.
+- **PDF canvas:** render each page to `<canvas>` via pdfjs-dist, stack vertically in scrollable container.
 
 ---
 
 ## 9. Email templates (Resend)
 
-Create JSX-based email templates using `@react-email/components` (optional but recommended):
+JSX-based templates via `@react-email/components` (optional but recommended):
 ```bash
 pnpm add @react-email/components
 ```
 
 Templates needed:
-1. Signup confirmation (handled by Supabase Auth — customize template in Supabase Dashboard)
-2. Password reset (handled by Supabase Auth)
-3. Workspace invite (custom — sent via Resend)
-4. Comment notification (custom — sent via Resend)
+1. Signup confirmation (Supabase Auth — customize template in Supabase Dashboard)
+2. Password reset (Supabase Auth)
+3. Workspace invite (custom — via Resend)
+4. Comment notification (custom — via Resend)
 5. Mention notification (custom)
 6. Status change notification (custom)
 
@@ -420,9 +420,9 @@ Templates needed:
 
 ## 10. Deployment
 
-User will handle Vercel connection. Build command, output directory: defaults work. Just ensure all env vars are set in Vercel Project Settings → Environment Variables (copy from `.env.local`).
+User handle Vercel connection. Build command, output dir: defaults work. Set all env vars in Vercel Project Settings → Environment Variables (copy from `.env.local`).
 
-The `SUPABASE_ACCESS_TOKEN` is NOT needed in Vercel — only used locally for migrations and type generation.
+`SUPABASE_ACCESS_TOKEN` NOT needed in Vercel — local only for migrations and type gen.
 
 ---
 
