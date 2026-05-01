@@ -5,6 +5,7 @@ import { MobileDrawer } from "@/components/workspace/mobile-drawer";
 import { NewMarkupModal } from "@/components/workspace/new-markup-modal";
 import { FoldersProvider } from "@/components/workspace/folders-context";
 import { AppShell } from "@/components/workspace/app-shell";
+import { CommandPalette } from "@/components/workspace/command-palette";
 import { createClient } from "@/lib/supabase/server";
 import { buildFolderTree } from "@/lib/folders";
 import type { WorkspaceSummary } from "@/components/workspace/workspace-switcher";
@@ -128,7 +129,12 @@ export default async function WorkspaceLayout({
             folders={folders}
           />
         }
-        modals={<NewMarkupModal workspaceId={workspace.id} />}
+        modals={
+          <>
+            <NewMarkupModal workspaceId={workspace.id} />
+            <CommandPalette workspaceId={workspace.id} />
+          </>
+        }
       >
         {children}
       </AppShell>

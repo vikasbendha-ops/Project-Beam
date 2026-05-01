@@ -1,8 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Building2, Loader2, LogOut, Trash2, User } from "lucide-react";
+import {
+  Bell,
+  Building2,
+  ImagePlus,
+  Loader2,
+  LogOut,
+  Trash2,
+  User,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -189,6 +198,15 @@ function WorkspaceTab({
   const router = useRouter();
   const [name, setName] = useState(workspace.name);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  const initials = workspace.name
+    .split(" ")
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
   async function save() {
     if (!name.trim() || name.trim() === workspace.name) return;
@@ -208,6 +226,46 @@ function WorkspaceTab({
     router.refresh();
   }
 
+  async function uploadAvatar(file: File) {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Pick an image file (PNG/JPG/WebP).");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Image too large (max 2 MB).");
+      return;
+    }
+    setUploading(true);
+    const res = await fetch(`/api/workspaces/${workspace.id}/avatar`, {
+      method: "POST",
+      headers: { "content-type": file.type },
+      body: file,
+    });
+    setUploading(false);
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({}));
+      toast.error(error ?? "Avatar upload failed");
+      return;
+    }
+    toast.success("Avatar updated");
+    router.refresh();
+  }
+
+  async function clearAvatar() {
+    setUploading(true);
+    const res = await fetch(`/api/workspaces/${workspace.id}/avatar`, {
+      method: "DELETE",
+    });
+    setUploading(false);
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({}));
+      toast.error(error ?? "Couldn't remove avatar");
+      return;
+    }
+    toast.success("Avatar removed");
+    router.refresh();
+  }
+
   return (
     <Card
       title="Workspace"
@@ -217,6 +275,63 @@ function WorkspaceTab({
           : "Settings for this team workspace."
       }
     >
+      {/* Avatar */}
+      <div className="flex items-center gap-4">
+        <Avatar className="size-16 border border-border">
+          {workspace.avatar_url ? (
+            <AvatarImage src={workspace.avatar_url} alt={workspace.name} />
+          ) : null}
+          <AvatarFallback className="bg-primary/10 text-base font-bold text-primary">
+            {initials || "W"}
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => fileRef.current?.click()}
+              disabled={!isOwner || uploading}
+            >
+              {uploading ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <ImagePlus className="size-4" />
+              )}
+              {workspace.avatar_url ? "Change avatar" : "Upload avatar"}
+            </Button>
+            {workspace.avatar_url ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={clearAvatar}
+                disabled={!isOwner || uploading}
+                className="text-muted-foreground hover:text-destructive"
+              >
+                <X className="size-4" />
+                Remove
+              </Button>
+            ) : null}
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            PNG, JPG, or WebP · up to 2 MB · square works best.
+          </p>
+        </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="sr-only"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void uploadAvatar(f);
+            e.target.value = "";
+          }}
+        />
+      </div>
+
       <div className="grid gap-2">
         <Label htmlFor="ws-name">Workspace name</Label>
         <Input
