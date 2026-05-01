@@ -7,6 +7,7 @@ import {
   Circle,
   Flag,
   MoreHorizontal,
+  Pencil,
   Trash2,
   X,
 } from "lucide-react";
@@ -25,6 +26,7 @@ import { useCanvasMutators } from "@/components/canvas/canvas-state";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type {
   CanvasCurrentUser,
+  CanvasMessage,
   CanvasProfile,
   CanvasThread,
 } from "@/components/canvas/types";
@@ -45,8 +47,14 @@ export function ThreadPopover({
   const isMobile = useIsMobile();
   const [working, setWorking] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const { postReply, setThreadStatus, setThreadPriority, deleteThread } =
-    useCanvasMutators();
+  const {
+    postReply,
+    setThreadStatus,
+    setThreadPriority,
+    editMessage,
+    deleteThread,
+    deleteMessage,
+  } = useCanvasMutators();
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -235,54 +243,22 @@ export function ThreadPopover({
         </header>
 
         <div className="max-h-[280px] flex-1 space-y-3 overflow-y-auto p-3">
-          {messages.map((m) => {
-            const author =
-              m.created_by && profiles[m.created_by]
-                ? profiles[m.created_by]
-                : null;
-            const name = author?.name ?? m.guest_name ?? "Unknown";
-            const initials = name
-              .split(" ")
-              .map((p) => p[0])
-              .slice(0, 2)
-              .join("")
-              .toUpperCase();
-            const time = m.created_at
-              ? formatDistanceToNow(new Date(m.created_at), {
-                  addSuffix: true,
-                })
-              : "";
-            const isPending = m.id.startsWith("tmp_");
-            return (
-              <article
-                key={m.id}
-                className={`flex gap-2 ${isPending ? "opacity-60" : ""}`}
-              >
-                <Avatar className="size-7 shrink-0 border border-border">
-                  {author?.avatar_url ? (
-                    <AvatarImage src={author.avatar_url} alt={name} />
-                  ) : null}
-                  <AvatarFallback className="bg-accent text-[10px] font-bold text-accent-foreground">
-                    {initials || "?"}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <header className="flex items-baseline gap-2">
-                    <span className="truncate text-xs font-semibold text-foreground">
-                      {name}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {isPending ? "Sending…" : time}
-                      {m.edited_at ? " · edited" : ""}
-                    </span>
-                  </header>
-                  <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-foreground">
-                    {m.content}
-                  </p>
-                </div>
-              </article>
-            );
-          })}
+          {messages.map((m) => (
+            <MessageItem
+              key={m.id}
+              message={m}
+              profile={
+                m.created_by && profiles[m.created_by]
+                  ? profiles[m.created_by]
+                  : null
+              }
+              isOwn={
+                m.created_by != null && m.created_by === currentUser.id
+              }
+              onEdit={(content) => editMessage(thread.id, m.id, content)}
+              onDelete={() => void deleteMessage(thread.id, m.id)}
+            />
+          ))}
         </div>
 
         <div className="border-t border-border p-2">
@@ -295,5 +271,161 @@ export function ThreadPopover({
         </div>
       </div>
     </div>
+  );
+}
+
+function MessageItem({
+  message: m,
+  profile,
+  isOwn,
+  onEdit,
+  onDelete,
+}: {
+  message: CanvasMessage;
+  profile: CanvasProfile | null;
+  isOwn: boolean;
+  onEdit: (content: string) => void | Promise<void>;
+  onDelete: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(m.content);
+  const [hover, setHover] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (editing) {
+      setDraft(m.content);
+      // Focus + place caret at end on next tick.
+      const t = setTimeout(() => {
+        const el = textareaRef.current;
+        if (el) {
+          el.focus();
+          el.selectionStart = el.value.length;
+          el.selectionEnd = el.value.length;
+        }
+      }, 20);
+      return () => clearTimeout(t);
+    }
+  }, [editing, m.content]);
+
+  const name = profile?.name ?? m.guest_name ?? "Unknown";
+  const initials = name
+    .split(" ")
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+  const time = m.created_at
+    ? formatDistanceToNow(new Date(m.created_at), { addSuffix: true })
+    : "";
+  const isPending =
+    typeof m.id === "string" && m.id.startsWith("tmp_");
+
+  async function save() {
+    const next = draft.trim();
+    if (!next || next === m.content.trim()) {
+      setEditing(false);
+      return;
+    }
+    await onEdit(next);
+    setEditing(false);
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setEditing(false);
+    } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      void save();
+    }
+  }
+
+  return (
+    <article
+      className={`group/msg flex gap-2 ${isPending ? "opacity-60" : ""}`}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <Avatar className="size-7 shrink-0 border border-border">
+        {profile?.avatar_url ? (
+          <AvatarImage src={profile.avatar_url} alt={name} />
+        ) : null}
+        <AvatarFallback className="bg-accent text-[10px] font-bold text-accent-foreground">
+          {initials || "?"}
+        </AvatarFallback>
+      </Avatar>
+      <div className="min-w-0 flex-1">
+        <header className="flex items-baseline gap-2">
+          <span className="truncate text-xs font-semibold text-foreground">
+            {name}
+          </span>
+          <span className="text-[10px] text-muted-foreground">
+            {isPending ? "Sending…" : time}
+            {m.edited_at ? " · edited" : ""}
+          </span>
+          {isOwn && !editing && hover && !isPending ? (
+            <span className="ml-auto inline-flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Edit message"
+              >
+                <Pencil className="size-3" />
+              </button>
+              <button
+                type="button"
+                onClick={onDelete}
+                className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                aria-label="Delete message"
+              >
+                <Trash2 className="size-3" />
+              </button>
+            </span>
+          ) : null}
+        </header>
+        {editing ? (
+          <div className="mt-1">
+            <textarea
+              ref={textareaRef}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={onKeyDown}
+              rows={Math.min(8, Math.max(2, draft.split("\n").length + 1))}
+              maxLength={4000}
+              className="w-full resize-y rounded-md border border-primary bg-card px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+            <div className="mt-1 flex items-center justify-end gap-1.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setEditing(false)}
+                className="h-7 px-2 text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void save()}
+                disabled={!draft.trim() || draft.trim() === m.content.trim()}
+                className="h-7 px-2 text-xs"
+              >
+                Save
+              </Button>
+            </div>
+            <p className="mt-1 text-[10px] text-muted-foreground/80">
+              ⌘/Ctrl + Enter to save · Esc to cancel
+            </p>
+          </div>
+        ) : (
+          <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-foreground">
+            {m.content}
+          </p>
+        )}
+      </div>
+    </article>
   );
 }

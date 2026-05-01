@@ -2,7 +2,14 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, X } from "lucide-react";
+import { ArrowDownUp, Check, Search, X } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { STATUS_LABEL } from "@/lib/constants";
 import type { Database } from "@/types/database";
@@ -29,6 +36,19 @@ const FILTER_OPTIONS: Array<{
   { key: "approved", label: STATUS_LABEL.approved, dot: "bg-emerald-500" },
 ];
 
+export type SortKey =
+  | "updated"
+  | "created"
+  | "comments"
+  | "review";
+
+const SORT_LABEL: Record<SortKey, string> = {
+  updated: "Recently updated",
+  created: "Recently created",
+  comments: "Most commented",
+  review: "Awaiting review",
+};
+
 interface DashboardFiltersProps {
   /** Optional counts per status, shown as suffix when present. */
   counts?: Partial<Record<MarkupStatus | "all", number>>;
@@ -42,6 +62,7 @@ export function DashboardFilters({ counts }: DashboardFiltersProps) {
     | MarkupStatus
     | "all";
   const currentQuery = params.get("q") ?? "";
+  const currentSort = (params.get("sort") ?? "updated") as SortKey;
 
   const [q, setQ] = useState(currentQuery);
   const lastPushedRef = useRef(currentQuery);
@@ -65,6 +86,15 @@ export function DashboardFilters({ counts }: DashboardFiltersProps) {
     const next = new URLSearchParams(params.toString());
     if (s === "all") next.delete("status");
     else next.set("status", s);
+    startTransition(() => {
+      router.replace(`?${next.toString()}`, { scroll: false });
+    });
+  }
+
+  function setSort(s: SortKey) {
+    const next = new URLSearchParams(params.toString());
+    if (s === "updated") next.delete("sort");
+    else next.set("sort", s);
     startTransition(() => {
       router.replace(`?${next.toString()}`, { scroll: false });
     });
@@ -110,25 +140,57 @@ export function DashboardFilters({ counts }: DashboardFiltersProps) {
         })}
       </div>
 
-      <div className="relative max-w-sm flex-1 lg:flex-initial">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-        <input
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search title or URL"
-          className="h-9 w-full rounded-full border border-border bg-card pl-8 pr-8 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-        />
-        {q ? (
-          <button
-            type="button"
-            onClick={() => setQ("")}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            aria-label="Clear search"
+      <div className="flex items-center gap-2">
+        <div className="relative max-w-sm flex-1 lg:w-72 lg:flex-initial">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search title or URL"
+            className="h-9 w-full rounded-full border border-border bg-card pl-8 pr-8 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          {q ? (
+            <button
+              type="button"
+              onClick={() => setQ("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label="Clear search"
+            >
+              <X className="size-3.5" />
+            </button>
+          ) : null}
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className="inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            aria-label="Sort"
           >
-            <X className="size-3.5" />
-          </button>
-        ) : null}
+            <ArrowDownUp className="size-3.5" />
+            <span className="hidden sm:inline">{SORT_LABEL[currentSort]}</span>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Sort by
+            </DropdownMenuLabel>
+            {(Object.keys(SORT_LABEL) as SortKey[]).map((s) => {
+              const active = s === currentSort;
+              return (
+                <DropdownMenuItem
+                  key={s}
+                  onSelect={() => setSort(s)}
+                  className={cn(active && "bg-muted/40 font-semibold")}
+                >
+                  <span className="flex-1">{SORT_LABEL[s]}</span>
+                  {active ? (
+                    <Check className="size-4 text-muted-foreground" />
+                  ) : null}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

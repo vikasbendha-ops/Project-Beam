@@ -95,74 +95,130 @@ function Hero() {
 
 function HeroPreview() {
   return (
-    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-border bg-card shadow-[0_30px_60px_-15px_rgba(28,25,23,0.25),0_8px_24px_-8px_rgba(79,70,229,0.12)]">
       {/* Browser chrome */}
-      <div className="flex h-10 items-center gap-2 border-b border-border bg-muted px-4">
-        <div className="size-3 rounded-full bg-muted-foreground/30" />
-        <div className="size-3 rounded-full bg-muted-foreground/30" />
-        <div className="size-3 rounded-full bg-muted-foreground/30" />
-        <div className="ml-3 h-6 flex-1 rounded-md border border-border bg-card" />
+      <div className="flex h-9 shrink-0 items-center gap-1.5 border-b border-border bg-muted/60 px-3">
+        <div className="size-2.5 rounded-full bg-rose-300/70" />
+        <div className="size-2.5 rounded-full bg-amber-300/70" />
+        <div className="size-2.5 rounded-full bg-emerald-300/70" />
+        <div className="ml-2 flex h-5 flex-1 items-center justify-center rounded-md border border-border/60 bg-card text-[9px] font-medium text-muted-foreground">
+          beam.app · landing-v3.png
+        </div>
       </div>
-      {/* Canvas area */}
-      <div className="relative h-[calc(100%-2.5rem)] w-full bg-gradient-to-br from-muted via-card to-accent">
-        {/* Decorative grid */}
-        <div
-          className="absolute inset-0 opacity-30"
-          style={{
-            backgroundImage:
-              "linear-gradient(to right, rgba(28,25,23,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(28,25,23,0.06) 1px, transparent 1px)",
-            backgroundSize: "32px 32px",
-          }}
-        />
-        {/* Pins */}
-        <Pin n={1} top="28%" left="38%" />
-        <Pin n={2} top="58%" left="68%">
-          <CommentBubble />
-        </Pin>
+
+      {/* App layout: comments rail + canvas */}
+      <div className="grid h-[calc(100%-2.25rem)] grid-cols-[120px_1fr]">
+        {/* Comments rail */}
+        <aside className="hidden flex-col gap-2 border-r border-border bg-card p-2 sm:flex">
+          <p className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
+            2 active
+          </p>
+          <div className="rounded-md border border-primary/40 bg-primary/5 p-1.5">
+            <div className="flex items-center gap-1">
+              <span className="flex size-3.5 items-center justify-center rounded-full bg-primary text-[8px] font-bold text-primary-foreground">
+                1
+              </span>
+              <span className="truncate text-[9px] font-semibold text-foreground">
+                Tighten kerning
+              </span>
+            </div>
+          </div>
+          <div className="rounded-md border border-border bg-muted/30 p-1.5">
+            <div className="flex items-center gap-1">
+              <span className="flex size-3.5 items-center justify-center rounded-full bg-primary text-[8px] font-bold text-primary-foreground">
+                2
+              </span>
+              <span className="truncate text-[9px] font-semibold text-foreground">
+                Make this pop
+              </span>
+            </div>
+          </div>
+        </aside>
+
+        {/* Canvas */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-muted via-card to-accent/40">
+          {/* Decorative subject */}
+          <div className="absolute inset-0">
+            <div
+              className="absolute inset-0 opacity-25"
+              style={{
+                backgroundImage:
+                  "linear-gradient(to right, rgba(28,25,23,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(28,25,23,0.06) 1px, transparent 1px)",
+                backgroundSize: "28px 28px",
+              }}
+            />
+            {/* Mock content blocks suggesting a real screenshot */}
+            <div className="absolute left-[18%] right-[18%] top-[18%] flex flex-col gap-2">
+              <div className="h-3 w-2/3 rounded-full bg-foreground/15" />
+              <div className="h-2 w-full rounded-full bg-foreground/10" />
+              <div className="h-2 w-5/6 rounded-full bg-foreground/10" />
+            </div>
+            <div className="absolute left-[18%] right-[18%] top-[48%] grid grid-cols-3 gap-2">
+              <div className="aspect-square rounded-lg bg-primary/15" />
+              <div className="aspect-square rounded-lg bg-sky-200/40" />
+              <div className="aspect-square rounded-lg bg-amber-200/40" />
+            </div>
+          </div>
+
+          {/* Pin 1 */}
+          <HeroPin n={1} top="28%" left="38%" />
+
+          {/* Pin 2 + popover */}
+          <div className="absolute" style={{ top: "58%", left: "68%" }}>
+            <HeroPin n={2} />
+            <div className="absolute left-9 top-0 w-52 rounded-[12px] border border-border bg-card p-2.5 shadow-[0_1px_2px_rgba(28,25,23,0.04),0_8px_24px_rgba(28,25,23,0.12)]">
+              <div className="flex items-start gap-2">
+                <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-accent-foreground">
+                  JD
+                </div>
+                <div className="min-w-0 flex-1 text-left">
+                  <p className="truncate text-[11px] font-semibold text-foreground">
+                    Make this pop more
+                  </p>
+                  <p className="mt-0.5 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">
+                    Could we boost the contrast so it stands out?
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Status pill — matches the real canvas top-bar treatment */}
+          <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-sky-700">
+            <span className="size-1.5 rounded-full bg-sky-500" />
+            Ready
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-function Pin({
+function HeroPin({
   n,
   top,
   left,
-  children,
 }: {
   n: number;
-  top: string;
-  left: string;
-  children?: React.ReactNode;
+  top?: string;
+  left?: string;
 }) {
   return (
-    <div className="absolute" style={{ top, left }}>
+    <div
+      className="absolute"
+      style={top || left ? { top, left } : undefined}
+    >
       <div
-        className="flex size-7 items-center justify-center rounded-full border-2 border-card bg-primary text-xs font-semibold text-primary-foreground shadow-[0_2px_6px_rgba(28,25,23,0.18)]"
         aria-label={`Pin ${n}`}
+        className="flex size-7 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground"
+        style={{
+          outline: "2px solid white",
+          outlineOffset: -2,
+          boxShadow:
+            "0 0 0 3px rgba(79,70,229,0.18), 0 4px 10px rgba(28,25,23,0.22)",
+        }}
       >
         {n}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function CommentBubble() {
-  return (
-    <div className="absolute left-1/2 top-10 z-10 w-64 -translate-x-1/2 rounded-[14px] border border-border bg-card p-4 shadow-[0_1px_2px_rgba(28,25,23,0.04),0_4px_12px_rgba(28,25,23,0.05)]">
-      <div className="flex items-start gap-3">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
-          JD
-        </div>
-        <div className="text-left">
-          <p className="text-sm font-semibold text-foreground">
-            Make this pop more
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Could we boost the contrast so the primary element stands out?
-          </p>
-        </div>
       </div>
     </div>
   );

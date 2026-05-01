@@ -122,6 +122,12 @@ interface CanvasMutators {
     y: number,
     pageNumber?: number | null,
   ) => Promise<void>;
+  /** Edit the content of an existing message. Optimistic; reverts on error. */
+  editMessage: (
+    threadId: string,
+    messageId: string,
+    content: string,
+  ) => Promise<void>;
   deleteThread: (threadId: string) => Promise<void>;
   deleteMessage: (threadId: string, messageId: string) => Promise<void>;
 }
@@ -538,6 +544,48 @@ export function CanvasStateProvider({
     [threads],
   );
 
+  const editMessage = useCallback(
+    async (threadId: string, messageId: string, content: string) => {
+      const thread = threads.find((t) => t.id === threadId);
+      const target = thread?.messages?.find((m) => m.id === messageId);
+      if (!thread || !target) return;
+      const trimmed = content.trim();
+      if (!trimmed || trimmed === target.content) return;
+      // Optimistic: swap content + stamp edited_at locally.
+      dispatch({
+        type: "REPLACE_MESSAGE",
+        threadId,
+        tempId: messageId,
+        message: {
+          ...target,
+          content: trimmed,
+          edited_at: new Date().toISOString(),
+        },
+      });
+      try {
+        const res = await fetch(`/api/messages/${messageId}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ content: trimmed }),
+        });
+        if (!res.ok) {
+          const { error } = await res.json().catch(() => ({}));
+          throw new Error(error ?? "Couldn't save edit");
+        }
+      } catch (err) {
+        // Revert.
+        dispatch({
+          type: "REPLACE_MESSAGE",
+          threadId,
+          tempId: messageId,
+          message: target,
+        });
+        toast.error(err instanceof Error ? err.message : "Couldn't save edit");
+      }
+    },
+    [threads],
+  );
+
   const deleteMessage = useCallback(
     async (threadId: string, messageId: string) => {
       const thread = threads.find((t) => t.id === threadId);
@@ -568,6 +616,7 @@ export function CanvasStateProvider({
       setThreadStatus,
       setThreadPriority,
       moveThread,
+      editMessage,
       deleteThread,
       deleteMessage,
     }),
@@ -578,6 +627,7 @@ export function CanvasStateProvider({
       setThreadStatus,
       setThreadPriority,
       moveThread,
+      editMessage,
       deleteThread,
       deleteMessage,
     ],

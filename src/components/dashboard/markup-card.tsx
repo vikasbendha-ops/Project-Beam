@@ -177,13 +177,13 @@ export function MarkupCard({ markup, workspaceId }: MarkupCardProps) {
         }}
         onDragEnd={() => setDragging(false)}
         className={cn(
-          "group relative flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-all hover:border-primary/30",
+          "group relative flex flex-col rounded-xl border border-border bg-card transition-all hover:border-primary/30",
           dragging && "scale-[0.98] opacity-50",
         )}
       >
         <Link
           href={`/w/${workspaceId}/markup/${markup.id}`}
-          className="flex flex-col"
+          className="flex flex-col overflow-hidden rounded-xl"
           draggable={false}
           onDragStart={(e) => e.preventDefault()}
         >
@@ -224,13 +224,11 @@ export function MarkupCard({ markup, workspaceId }: MarkupCardProps) {
                 <Calendar className="size-3" strokeWidth={1.5} />
                 {updated}
               </span>
-              <span className="inline-flex items-center gap-1">
-                <MessageSquare className="size-3" strokeWidth={1.5} />
-                {markup.thread_count ?? 0}
-              </span>
+              <CommentHeat count={markup.thread_count ?? 0} />
             </div>
           </div>
         </Link>
+        <HoverPreview markup={markup} updated={updated} TypeIcon={TypeIcon} />
 
         <DropdownMenu>
           <DropdownMenuTrigger
@@ -409,6 +407,93 @@ export function MarkupCard({ markup, workspaceId }: MarkupCardProps) {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+/**
+ * Comment activity heat dot. Visual signal for how active a markup is —
+ * gray (none), sky (1-4), amber pulse (5+).
+ */
+function CommentHeat({ count }: { count: number }) {
+  const tone =
+    count === 0
+      ? "bg-muted-foreground/30"
+      : count <= 4
+        ? "bg-sky-500"
+        : "bg-amber-500 animate-pulse";
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span
+        className={cn("size-1.5 rounded-full", tone)}
+        aria-hidden
+      />
+      <span className="inline-flex items-center gap-1">
+        <MessageSquare className="size-3" strokeWidth={1.5} />
+        {count}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Hover-preview panel. Bigger thumbnail + status + counts. Appears
+ * under the card with a 300ms hover delay; positioned absolute so it
+ * floats above neighbouring cards.
+ */
+function HoverPreview({
+  markup,
+  updated,
+  TypeIcon,
+}: {
+  markup: MarkupSummary;
+  updated: string;
+  TypeIcon: typeof FileText;
+}) {
+  return (
+    <div
+      role="presentation"
+      aria-hidden
+      className={cn(
+        "pointer-events-none absolute left-1/2 top-full z-30 mt-2 w-[260px] -translate-x-1/2 rounded-[14px] border border-border bg-card opacity-0 shadow-modal transition-opacity duration-200 [transition-delay:300ms]",
+        "group-hover:opacity-100 group-hover:[transition-delay:300ms]",
+      )}
+    >
+      <div className="relative aspect-video w-full overflow-hidden rounded-t-[14px] bg-muted">
+        {markup.thumbnail_url ? (
+          <Image
+            src={markup.thumbnail_url}
+            alt=""
+            fill
+            sizes="260px"
+            className="object-cover"
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center text-muted-foreground">
+            <TypeIcon className="size-8" strokeWidth={1.25} />
+          </div>
+        )}
+        {markup.status ? (
+          <div className="absolute right-2 top-2">
+            <StatusPill status={markup.status} size="sm" />
+          </div>
+        ) : null}
+      </div>
+      <div className="space-y-1.5 p-3">
+        <p className="truncate text-sm font-semibold text-foreground">
+          {markup.title ?? "Untitled"}
+        </p>
+        <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <Calendar className="size-3" strokeWidth={1.5} />
+            {updated}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <MessageSquare className="size-3" strokeWidth={1.5} />
+            {markup.thread_count ?? 0}
+          </span>
+        </div>
+      </div>
+    </div>
   );
 }
 

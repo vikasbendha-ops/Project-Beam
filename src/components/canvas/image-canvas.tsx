@@ -1,10 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pin } from "@/components/canvas/pin";
+import { PinCluster } from "@/components/canvas/pin-cluster";
 import type { CanvasThread } from "@/components/canvas/types";
 import { useCanvasStore } from "@/stores/canvas-store";
 import { cn } from "@/lib/utils";
+
+interface ClusterShape {
+  id: string;
+  x: number;
+  y: number;
+  count: number;
+  unresolved: number;
+  firstThreadId: string;
+}
 
 interface ImageCanvasProps {
   src: string | null;
@@ -77,6 +87,52 @@ export function ImageCanvas({
   const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(
     null,
   );
+
+  // Cluster pins when the user has zoomed out enough that individual pins
+  // would visually overlap. We bucket by 8% × 8% grid cells; any cell with
+  // 2+ pins becomes a cluster bubble. Threshold + cell size are tuned so
+  // pins stay individual at the default fit-width view.
+  const setZoomSmooth = useCanvasStore((s) => s.setZoomSmooth);
+  const clustering = fit === "actual" && zoom < 0.55 && threads.length > 5;
+  const { soloPins, clusters } = useMemo(() => {
+    if (!clustering) {
+      return { soloPins: threads, clusters: [] as ClusterShape[] };
+    }
+    const cellSize = 8;
+    const buckets = new Map<string, CanvasThread[]>();
+    for (const t of threads) {
+      if (t.x_position == null || t.y_position == null) continue;
+      const cx = Math.floor(Number(t.x_position) / cellSize);
+      const cy = Math.floor(Number(t.y_position) / cellSize);
+      const key = `${cx}-${cy}`;
+      const bucket = buckets.get(key) ?? [];
+      bucket.push(t);
+      buckets.set(key, bucket);
+    }
+    const solo: CanvasThread[] = [];
+    const groups: ClusterShape[] = [];
+    for (const bucket of buckets.values()) {
+      if (bucket.length === 1) {
+        solo.push(bucket[0]);
+      } else {
+        const ax =
+          bucket.reduce((s, t) => s + Number(t.x_position ?? 0), 0) /
+          bucket.length;
+        const ay =
+          bucket.reduce((s, t) => s + Number(t.y_position ?? 0), 0) /
+          bucket.length;
+        groups.push({
+          id: bucket.map((t) => t.id).join("|"),
+          x: ax,
+          y: ay,
+          count: bucket.length,
+          unresolved: bucket.filter((t) => t.status !== "resolved").length,
+          firstThreadId: bucket[0].id,
+        });
+      }
+    }
+    return { soloPins: solo, clusters: groups };
+  }, [threads, clustering]);
 
   // Track Space-key state globally so users can pan over pins/composer.
   useEffect(() => {
@@ -284,7 +340,24 @@ export function ImageCanvas({
 
         {!hidePins && imgSize ? (
           <>
-            {threads.map((t) => {
+            {clusters.map((c) => (
+              <div key={c.id} data-pin>
+                <PinCluster
+                  x={c.x}
+                  y={c.y}
+                  count={c.count}
+                  unresolved={c.unresolved}
+                  size={pinSize + 8}
+                  onClick={() => {
+                    // Zoom in to make individual pins legible, then surface
+                    // the first thread so the user lands somewhere useful.
+                    setZoomSmooth(1.5);
+                    setActiveThread(c.firstThreadId);
+                  }}
+                />
+              </div>
+            ))}
+            {soloPins.map((t) => {
               if (t.x_position == null || t.y_position == null) return null;
               const firstMessage = (t.messages ?? [])[0];
               const replyCount = Math.max(

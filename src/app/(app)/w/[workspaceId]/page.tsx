@@ -23,8 +23,11 @@ const STATUS_VALUES: ReadonlyArray<MarkupStatus> = [
 
 interface WorkspacePageProps {
   params: Promise<{ workspaceId: string }>;
-  searchParams: Promise<{ status?: string; q?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; sort?: string }>;
 }
+
+const SORT_KEYS = ["updated", "created", "comments", "review"] as const;
+type SortKey = (typeof SORT_KEYS)[number];
 
 export default async function WorkspaceDashboard({
   params,
@@ -52,6 +55,10 @@ export default async function WorkspaceDashboard({
       ? (sp.status as MarkupStatus)
       : null;
   const queryFilter = (sp.q ?? "").trim();
+  const sortKey: SortKey =
+    sp.sort && (SORT_KEYS as readonly string[]).includes(sp.sort)
+      ? (sp.sort as SortKey)
+      : "updated";
 
   // Top-level markups (folder_id is null) for this workspace.
   // Use the markup_summary view so we get comment counts etc.
@@ -60,8 +67,26 @@ export default async function WorkspaceDashboard({
     .select("*")
     .eq("workspace_id", workspace.id)
     .is("folder_id", null)
-    .order("updated_at", { ascending: false })
     .limit(60);
+  if (sortKey === "comments") {
+    query = query
+      .order("thread_count", { ascending: false, nullsFirst: false })
+      .order("updated_at", { ascending: false });
+  } else if (sortKey === "created") {
+    query = query.order("created_at", { ascending: false });
+  } else if (sortKey === "review") {
+    // Awaiting review = Ready or Changes requested first, then by updated_at.
+    // Implemented client-side via two queries would be wasteful; instead,
+    // we sort updated_at desc and the UI always surfaces those statuses
+    // via the filter pills. To honour the sort intent, narrow to those
+    // statuses unless an explicit status filter overrides.
+    if (!statusFilter) {
+      query = query.in("status", ["ready_for_review", "changes_requested"]);
+    }
+    query = query.order("updated_at", { ascending: false });
+  } else {
+    query = query.order("updated_at", { ascending: false });
+  }
   if (statusFilter) query = query.eq("status", statusFilter);
   if (queryFilter) {
     // Match against title or source_url, case-insensitive.
