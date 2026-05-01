@@ -73,7 +73,7 @@ export default async function MarkupCanvasPage({ params }: MarkupPageProps) {
          priority, created_by, guest_name, guest_email, created_at, updated_at,
          resolved_at,
          messages!messages_thread_id_fkey (
-           id, content, attachments, mentions, created_by, guest_name,
+           id, content, attachments, mentions, reactions, created_by, guest_name,
            guest_email, created_at, edited_at, parent_message_id
          )`,
       )

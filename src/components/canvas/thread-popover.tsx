@@ -8,6 +8,7 @@ import {
   Flag,
   MoreHorizontal,
   Pencil,
+  SmilePlus,
   Trash2,
   X,
 } from "lucide-react";
@@ -52,6 +53,7 @@ export function ThreadPopover({
     setThreadStatus,
     setThreadPriority,
     editMessage,
+    toggleReaction,
     deleteThread,
     deleteMessage,
   } = useCanvasMutators();
@@ -252,10 +254,14 @@ export function ThreadPopover({
                   ? profiles[m.created_by]
                   : null
               }
+              currentUserId={currentUser.id}
               isOwn={
                 m.created_by != null && m.created_by === currentUser.id
               }
               onEdit={(content) => editMessage(thread.id, m.id, content)}
+              onReact={(emoji) =>
+                void toggleReaction(thread.id, m.id, emoji)
+              }
               onDelete={() => void deleteMessage(thread.id, m.id)}
             />
           ))}
@@ -274,17 +280,23 @@ export function ThreadPopover({
   );
 }
 
+const REACTION_PALETTE = ["👍", "❤️", "😂", "👀", "🚀", "⭐"] as const;
+
 function MessageItem({
   message: m,
   profile,
+  currentUserId,
   isOwn,
   onEdit,
+  onReact,
   onDelete,
 }: {
   message: CanvasMessage;
   profile: CanvasProfile | null;
+  currentUserId: string;
   isOwn: boolean;
   onEdit: (content: string) => void | Promise<void>;
+  onReact: (emoji: string) => void;
   onDelete: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -364,24 +376,29 @@ function MessageItem({
             {isPending ? "Sending…" : time}
             {m.edited_at ? " · edited" : ""}
           </span>
-          {isOwn && !editing && hover && !isPending ? (
+          {!editing && hover && !isPending ? (
             <span className="ml-auto inline-flex items-center gap-0.5">
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                aria-label="Edit message"
-              >
-                <Pencil className="size-3" />
-              </button>
-              <button
-                type="button"
-                onClick={onDelete}
-                className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
-                aria-label="Delete message"
-              >
-                <Trash2 className="size-3" />
-              </button>
+              <ReactionPicker onPick={onReact} />
+              {isOwn ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(true)}
+                    className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    aria-label="Edit message"
+                  >
+                    <Pencil className="size-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onDelete}
+                    className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                    aria-label="Delete message"
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
+                </>
+              ) : null}
             </span>
           ) : null}
         </header>
@@ -425,7 +442,107 @@ function MessageItem({
             {m.content}
           </p>
         )}
+        {!editing ? (
+          <ReactionRow
+            reactions={
+              (m.reactions as Record<string, string[]> | null) ?? {}
+            }
+            currentUserId={currentUserId}
+            onToggle={onReact}
+          />
+        ) : null}
       </div>
     </article>
+  );
+}
+
+/** Trigger that opens an emoji-picker popover. Six predefined emojis;
+ *  click → fires onPick + closes. */
+function ReactionPicker({ onPick }: { onPick: (emoji: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  return (
+    <div ref={wrapRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        aria-label="Add reaction"
+      >
+        <SmilePlus className="size-3" />
+      </button>
+      {open ? (
+        <div className="absolute right-0 top-full z-30 mt-1 flex items-center gap-0.5 rounded-full border border-border bg-card p-1 shadow-modal">
+          {REACTION_PALETTE.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              onClick={() => {
+                onPick(emoji);
+                setOpen(false);
+              }}
+              className="flex size-7 items-center justify-center rounded-full text-base transition-transform hover:scale-125 hover:bg-muted"
+              aria-label={`React with ${emoji}`}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Inline row of reaction chips. Each chip shows the emoji + count;
+ *  the current user's reactions are highlighted. Click toggles. */
+function ReactionRow({
+  reactions,
+  currentUserId,
+  onToggle,
+}: {
+  reactions: Record<string, string[]>;
+  currentUserId: string;
+  onToggle: (emoji: string) => void;
+}) {
+  const entries = Object.entries(reactions).filter(([, list]) => list.length);
+  if (entries.length === 0) return null;
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1">
+      {entries.map(([emoji, list]) => {
+        const mine = list.includes(currentUserId);
+        return (
+          <button
+            key={emoji}
+            type="button"
+            onClick={() => onToggle(emoji)}
+            className={
+              mine
+                ? "inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold text-primary transition-colors"
+                : "inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
+            }
+            aria-pressed={mine}
+            aria-label={`${emoji} ${list.length}`}
+          >
+            <span>{emoji}</span>
+            <span className="tabular-nums">{list.length}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }

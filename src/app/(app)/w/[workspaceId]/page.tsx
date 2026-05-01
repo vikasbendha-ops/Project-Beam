@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { ChevronRight } from "lucide-react";
-import { MarkupCard } from "@/components/dashboard/markup-card";
+import { MarkupGrid } from "@/components/dashboard/markup-grid";
 import { DashboardEmptyState } from "@/components/dashboard/empty-state";
 import { DashboardFilters } from "@/components/dashboard/dashboard-filters";
 import { NewMarkupButton } from "@/components/workspace/new-markup-button";
@@ -150,11 +150,7 @@ export default async function WorkspaceDashboard({
           <DashboardEmptyState />
         )
       ) : (
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {markups.map((m) => (
-            <MarkupCard key={m.id} markup={m} workspaceId={workspace.id} />
-          ))}
-        </div>
+        <MarkupGrid markups={markups} workspaceId={workspace.id} />
       )}
     </div>
   );

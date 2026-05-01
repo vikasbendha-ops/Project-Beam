@@ -1,15 +1,18 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Activity,
   Bell,
   Building2,
   ImagePlus,
   Loader2,
   LogOut,
+  Plug,
   Trash2,
   User,
+  Webhook,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -42,7 +45,14 @@ interface SettingsViewProps {
   isOwner: boolean;
 }
 
-type Tab = "profile" | "workspace" | "notifications" | "danger";
+type Tab =
+  | "profile"
+  | "workspace"
+  | "notifications"
+  | "integrations"
+  | "webhooks"
+  | "audit"
+  | "danger";
 
 export function SettingsView({
   workspace,
@@ -60,6 +70,9 @@ export function SettingsView({
     { id: "profile", label: "Profile", icon: User },
     { id: "workspace", label: "Workspace", icon: Building2 },
     { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "integrations", label: "Integrations", icon: Plug },
+    { id: "webhooks", label: "Webhooks", icon: Webhook },
+    { id: "audit", label: "Audit log", icon: Activity },
     { id: "danger", label: "Danger zone", icon: Trash2 },
   ];
 
@@ -104,6 +117,11 @@ export function SettingsView({
           ) : null}
           {tab === "notifications" ? (
             <NotificationsTab preferences={preferences} />
+          ) : null}
+          {tab === "integrations" ? <IntegrationsTab /> : null}
+          {tab === "webhooks" ? <WebhooksTab /> : null}
+          {tab === "audit" ? (
+            <AuditLogTab workspaceId={workspace.id} />
           ) : null}
           {tab === "danger" ? (
             <DangerTab workspace={workspace} isOwner={isOwner} />
@@ -443,6 +461,244 @@ function NotificationsTab({
       </div>
     </Card>
   );
+}
+
+/* -------- Integrations (stub for upcoming features) -------- */
+
+function IntegrationsTab() {
+  // Curated set of upcoming connectors. Each renders as a card with a
+  // disabled "Connect" affordance + "Coming soon" pill so the surface
+  // feels real but doesn't promise anything we haven't built yet.
+  const items: Array<{
+    name: string;
+    blurb: string;
+    glyph: string;
+    soon?: boolean;
+  }> = [
+    {
+      name: "Slack",
+      blurb: "Push @-mentions and resolve events into a channel.",
+      glyph: "S",
+      soon: true,
+    },
+    {
+      name: "Linear",
+      blurb: "Convert resolved threads into Linear issues with one click.",
+      glyph: "L",
+      soon: true,
+    },
+    {
+      name: "Figma",
+      blurb: "Embed Beam pins on top of any Figma frame.",
+      glyph: "F",
+      soon: true,
+    },
+    {
+      name: "Zapier",
+      blurb: "Trigger zaps from any approve / status-change event.",
+      glyph: "Z",
+      soon: true,
+    },
+  ];
+  return (
+    <Card
+      title="Integrations"
+      description="Hook Beam into the tools your team already lives in."
+    >
+      <ul className="grid gap-3 sm:grid-cols-2">
+        {items.map((it) => (
+          <li
+            key={it.name}
+            className="flex items-start gap-3 rounded-xl border border-border bg-background p-4"
+          >
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+              {it.glyph}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-foreground">
+                  {it.name}
+                </p>
+                {it.soon ? (
+                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Soon
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{it.blurb}</p>
+              <button
+                type="button"
+                disabled
+                className="mt-3 rounded-md border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-muted-foreground disabled:cursor-not-allowed"
+              >
+                Connect
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+/* -------- Webhooks (read-only placeholder) -------- */
+
+function WebhooksTab() {
+  return (
+    <Card
+      title="Webhooks"
+      description="Send signed POSTs to your endpoint when MarkUps move through review."
+    >
+      <div className="rounded-xl border border-dashed border-border bg-background/50 p-6 text-center">
+        <Webhook
+          className="mx-auto size-7 text-muted-foreground"
+          strokeWidth={1.25}
+        />
+        <p className="mt-3 text-sm font-semibold text-foreground">
+          No webhooks yet
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Webhook subscriptions ship in the next release. We&rsquo;ll fire on
+          <code className="mx-1 rounded bg-muted px-1 py-0.5 text-[11px] font-mono">
+            markup.approved
+          </code>
+          ,{" "}
+          <code className="mx-1 rounded bg-muted px-1 py-0.5 text-[11px] font-mono">
+            thread.resolved
+          </code>
+          , and{" "}
+          <code className="mx-1 rounded bg-muted px-1 py-0.5 text-[11px] font-mono">
+            comment.created
+          </code>
+          .
+        </p>
+        <button
+          type="button"
+          disabled
+          className="mt-4 inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground disabled:cursor-not-allowed"
+        >
+          Add endpoint
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+/* -------- Audit log -------- */
+
+interface AuditRow {
+  id: string;
+  type: string;
+  created_at: string | null;
+  content_preview: string | null;
+  triggered_by_name: string | null;
+  markup_title: string | null;
+}
+
+function AuditLogTab({ workspaceId }: { workspaceId: string }) {
+  const [rows, setRows] = useState<AuditRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/workspaces/${workspaceId}/audit?limit=120`,
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = (await res.json()) as { rows: AuditRow[] };
+        if (!cancelled) setRows(json.rows);
+      } catch (err) {
+        if (!cancelled)
+          setError(err instanceof Error ? err.message : "Failed to load");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId]);
+
+  return (
+    <Card
+      title="Audit log"
+      description="Every status change, approve, share, and comment dispatch in this workspace."
+    >
+      {error ? (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+          {error}
+        </div>
+      ) : rows == null ? (
+        <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
+          <Loader2 className="mr-2 size-4 animate-spin" />
+          Loading…
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border bg-background/50 px-4 py-10 text-center text-sm text-muted-foreground">
+          No activity yet.
+        </div>
+      ) : (
+        <ul className="divide-y divide-border rounded-xl border border-border bg-background">
+          {rows.map((r) => (
+            <li
+              key={r.id}
+              className="flex items-baseline gap-3 px-4 py-2.5 text-sm"
+            >
+              <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                {r.created_at
+                  ? new Date(r.created_at).toLocaleString(undefined, {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                    })
+                  : ""}
+              </span>
+              <span className="min-w-0 flex-1 truncate">
+                <span className="font-semibold text-foreground">
+                  {r.triggered_by_name ?? "Someone"}
+                </span>{" "}
+                <span className="text-muted-foreground">{verbFor(r.type)}</span>
+                {r.markup_title ? (
+                  <span className="font-medium text-foreground">
+                    {" "}
+                    {r.markup_title}
+                  </span>
+                ) : null}
+                {r.content_preview ? (
+                  <span className="text-muted-foreground/80">
+                    {" "}
+                    — {r.content_preview}
+                  </span>
+                ) : null}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+function verbFor(type: string): string {
+  switch (type) {
+    case "comment":
+      return "commented on";
+    case "mention":
+      return "mentioned someone in";
+    case "reply":
+      return "replied on";
+    case "resolve":
+      return "resolved a thread on";
+    case "status_change":
+      return "changed status of";
+    case "share":
+      return "shared";
+    case "invite":
+      return "invited a teammate to";
+    case "approve":
+      return "approved";
+    default:
+      return "updated";
+  }
 }
 
 function DangerTab({

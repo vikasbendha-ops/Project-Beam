@@ -285,6 +285,7 @@ export type Database = {
           id: string
           mentions: string[] | null
           parent_message_id: string | null
+          reactions: Json
           thread_id: string
           updated_at: string
         }
@@ -299,6 +300,7 @@ export type Database = {
           id?: string
           mentions?: string[] | null
           parent_message_id?: string | null
+          reactions?: Json
           thread_id: string
           updated_at?: string
         }
@@ -313,6 +315,7 @@ export type Database = {
           id?: string
           mentions?: string[] | null
           parent_message_id?: string | null
+          reactions?: Json
           thread_id?: string
           updated_at?: string
         }

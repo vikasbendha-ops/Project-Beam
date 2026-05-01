@@ -75,6 +75,13 @@ const STATUS_ORDER: MarkupStatus[] = [
 interface MarkupCardProps {
   markup: MarkupSummary;
   workspaceId: string;
+  /** When `selectionMode` is true, the checkbox is always visible. When
+   *  false, it appears only on hover. Either way, clicking it fires
+   *  `onToggleSelect`. The card link is suppressed in selection mode so
+   *  bulk-edit clicks don't accidentally navigate. */
+  selected?: boolean;
+  selectionMode?: boolean;
+  onToggleSelect?: (e: React.MouseEvent) => void;
 }
 
 const TYPE_ICON = {
@@ -83,7 +90,13 @@ const TYPE_ICON = {
   website: Globe,
 } as const;
 
-export function MarkupCard({ markup, workspaceId }: MarkupCardProps) {
+export function MarkupCard({
+  markup,
+  workspaceId,
+  selected = false,
+  selectionMode = false,
+  onToggleSelect,
+}: MarkupCardProps) {
   const router = useRouter();
   const { flat: foldersFlat } = useFolders();
   const [renameOpen, setRenameOpen] = useState(false);
@@ -168,24 +181,57 @@ export function MarkupCard({ markup, workspaceId }: MarkupCardProps) {
   return (
     <>
       <div
-        draggable
+        draggable={!selectionMode}
         onDragStart={(e) => {
-          if (!markup.id) return;
+          if (!markup.id || selectionMode) return;
           e.dataTransfer.setData(MARKUP_DRAG_TYPE, markup.id);
           e.dataTransfer.effectAllowed = "move";
           setDragging(true);
         }}
         onDragEnd={() => setDragging(false)}
         className={cn(
-          "group relative flex flex-col rounded-xl border border-border bg-card transition-all hover:border-primary/30",
+          "group relative flex flex-col rounded-xl border bg-card transition-all",
+          selected
+            ? "border-primary ring-2 ring-primary/30"
+            : "border-border hover:border-primary/30",
           dragging && "scale-[0.98] opacity-50",
         )}
       >
+        {/* Selection checkbox — visible always in selection mode, on
+            hover otherwise. Clicking suppresses link navigation. */}
+        {onToggleSelect ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleSelect(e);
+            }}
+            aria-label={selected ? "Deselect" : "Select"}
+            className={cn(
+              "absolute left-3 top-3 z-20 flex size-5 items-center justify-center rounded-md border-2 transition-all",
+              selected
+                ? "border-primary bg-primary text-primary-foreground opacity-100"
+                : "border-border bg-card/95 text-transparent opacity-0 backdrop-blur group-hover:opacity-100",
+              selectionMode && !selected && "opacity-100",
+            )}
+          >
+            {selected ? <Check className="size-3.5" strokeWidth={3} /> : null}
+          </button>
+        ) : null}
         <Link
-          href={`/w/${workspaceId}/markup/${markup.id}`}
+          href={selectionMode ? "#" : `/w/${workspaceId}/markup/${markup.id}`}
           className="flex flex-col overflow-hidden rounded-xl"
           draggable={false}
           onDragStart={(e) => e.preventDefault()}
+          onClick={(e) => {
+            // In selection mode, clicking the card body toggles selection
+            // instead of navigating, so bulk operations stay intuitive.
+            if (selectionMode && onToggleSelect) {
+              e.preventDefault();
+              onToggleSelect(e);
+            }
+          }}
         >
           <div className="relative aspect-video w-full overflow-hidden bg-muted">
             {markup.thumbnail_url ? (

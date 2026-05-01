@@ -25,11 +25,18 @@ export interface CanvasVersion {
   page_count: number | null;
 }
 
+/** Emoji-keyed map of user-id arrays. Stored as `messages.reactions` JSONB.
+ *  An emoji key is omitted (rather than empty) when nobody has reacted. */
+export type ReactionMap = Record<string, string[]>;
+
 export interface CanvasMessage {
   id: string;
   content: string;
   attachments: unknown;
   mentions: string[] | null;
+  /** May be null when fetched from a SQL view that types JSONB columns
+   *  loosely. Always read as `(reactions ?? {})` at the call site. */
+  reactions: ReactionMap | unknown | null;
   created_by: string | null;
   guest_name: string | null;
   guest_email: string | null;

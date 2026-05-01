@@ -131,49 +131,85 @@ export function PdfCanvas({
     };
   }, [src]);
 
-  // Phase 2: once wrappers are in the DOM, render each page into its wrapper.
-  // Runs after `pages` is populated so the refs map is reliably filled.
+  // Phase 2: render each page into its wrapper. Page 1 renders eagerly (so
+  // the thumbnail callback fires + the user sees content immediately);
+  // pages 2+ are lazy via IntersectionObserver — they only paint when they
+  // come within `rootMargin` of the viewport. Big PDFs no longer render
+  // every page upfront.
   useEffect(() => {
     const pdf = pdfRef.current;
     if (!pdf || pages.length === 0) return;
     let cancelled = false;
+    const renderedSet = new Set<number>();
 
-    (async () => {
-      for (const meta of pages) {
-        const wrapper = wrapperRefs.current.get(meta.pageNumber);
-        if (!wrapper || cancelled) continue;
-        // Skip if we've already rendered (HMR / re-mount).
-        if (wrapper.querySelector("canvas")) continue;
-        try {
-          const page = await pdf.getPage(meta.pageNumber);
-          const viewport = page.getViewport({ scale: PAGE_RENDER_SCALE });
-          const canvas = document.createElement("canvas");
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          canvas.dataset.pageNumber = String(meta.pageNumber);
-          canvas.className =
-            "block w-full select-none rounded-lg shadow-card";
-          canvas.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) continue;
-          await page.render({ canvasContext: ctx, viewport, canvas }).promise;
-          if (cancelled) return;
-          wrapper.replaceChildren(canvas);
-          if (meta.pageNumber === 1 && onFirstPageRendered) {
-            try {
-              onFirstPageRendered(canvas);
-            } catch (cbErr) {
-              console.error("[pdf] thumbnail callback failed", cbErr);
-            }
-          }
-        } catch (err) {
-          console.error(`[pdf] page ${meta.pageNumber}`, err);
-        }
+    async function renderPage(pageNumber: number) {
+      if (renderedSet.has(pageNumber) || cancelled) return;
+      const wrapper = wrapperRefs.current.get(pageNumber);
+      if (!wrapper) return;
+      if (wrapper.querySelector("canvas")) {
+        renderedSet.add(pageNumber);
+        return;
       }
-    })();
+      renderedSet.add(pageNumber);
+      try {
+        const page = await pdf!.getPage(pageNumber);
+        const viewport = page.getViewport({ scale: PAGE_RENDER_SCALE });
+        const canvas = document.createElement("canvas");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        canvas.dataset.pageNumber = String(pageNumber);
+        canvas.className = "block w-full select-none rounded-lg shadow-card";
+        canvas.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+        if (cancelled) return;
+        wrapper.replaceChildren(canvas);
+        if (pageNumber === 1 && onFirstPageRendered) {
+          try {
+            onFirstPageRendered(canvas);
+          } catch (cbErr) {
+            console.error("[pdf] thumbnail callback failed", cbErr);
+          }
+        }
+      } catch (err) {
+        // Re-allow retry on failure.
+        renderedSet.delete(pageNumber);
+        console.error(`[pdf] page ${pageNumber}`, err);
+      }
+    }
+
+    // Page 1 renders eagerly.
+    void renderPage(1);
+
+    // Pages 2+ render on intersection. rootMargin pre-renders one viewport
+    // ahead so scrolling never reveals a blank page.
+    if (typeof IntersectionObserver === "undefined" || pages.length <= 1) {
+      return () => {
+        cancelled = true;
+      };
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const n = Number(
+            (entry.target as HTMLElement).dataset.pageWrapper ?? 0,
+          );
+          if (n > 0) void renderPage(n);
+        }
+      },
+      { rootMargin: "1200px 0px", threshold: 0.01 },
+    );
+    for (const meta of pages) {
+      if (meta.pageNumber === 1) continue;
+      const wrapper = wrapperRefs.current.get(meta.pageNumber);
+      if (wrapper) observer.observe(wrapper);
+    }
 
     return () => {
       cancelled = true;
+      observer.disconnect();
     };
   }, [pages, onFirstPageRendered]);
 

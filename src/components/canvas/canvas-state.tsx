@@ -128,6 +128,12 @@ interface CanvasMutators {
     messageId: string,
     content: string,
   ) => Promise<void>;
+  /** Toggle the current user's reaction on a message. Optimistic. */
+  toggleReaction: (
+    threadId: string,
+    messageId: string,
+    emoji: string,
+  ) => Promise<void>;
   deleteThread: (threadId: string) => Promise<void>;
   deleteMessage: (threadId: string, messageId: string) => Promise<void>;
 }
@@ -245,6 +251,26 @@ export function CanvasStateProvider({
       .on(
         "postgres_changes",
         {
+          event: "UPDATE",
+          schema: "public",
+          table: "messages",
+        },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>;
+          // Reuse REPLACE_MESSAGE — the matching message swaps to the new
+          // server row. Covers edits AND reaction toggles, both of which
+          // arrive as UPDATEs.
+          dispatch({
+            type: "REPLACE_MESSAGE",
+            threadId: String(row.thread_id),
+            tempId: String(row.id),
+            message: rowToMessage(row),
+          });
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
           event: "DELETE",
           schema: "public",
           table: "messages",
@@ -292,6 +318,7 @@ export function CanvasStateProvider({
             content: input.content,
             attachments: [],
             mentions: [],
+            reactions: {},
             created_by: currentUser.id,
             guest_name: null,
             guest_email: null,
@@ -361,6 +388,7 @@ export function CanvasStateProvider({
         content,
         attachments: [],
         mentions: [],
+        reactions: {},
         created_by: currentUser.id,
         guest_name: null,
         guest_email: null,
@@ -586,6 +614,53 @@ export function CanvasStateProvider({
     [threads],
   );
 
+  const toggleReaction = useCallback(
+    async (threadId: string, messageId: string, emoji: string) => {
+      const thread = threads.find((t) => t.id === threadId);
+      const target = thread?.messages?.find((m) => m.id === messageId);
+      if (!thread || !target) return;
+      const userId = currentUser.id;
+      const current = (target.reactions as Record<string, string[]> | null) ?? {};
+      const list = current[emoji] ?? [];
+      const has = list.includes(userId);
+      const nextList = has
+        ? list.filter((u) => u !== userId)
+        : [...list, userId];
+      const nextReactions: Record<string, string[]> = { ...current };
+      if (nextList.length === 0) delete nextReactions[emoji];
+      else nextReactions[emoji] = nextList;
+
+      // Optimistic.
+      dispatch({
+        type: "REPLACE_MESSAGE",
+        threadId,
+        tempId: messageId,
+        message: { ...target, reactions: nextReactions },
+      });
+      try {
+        const res = await fetch(`/api/messages/${messageId}/reactions`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ emoji }),
+        });
+        if (!res.ok) {
+          const { error } = await res.json().catch(() => ({}));
+          throw new Error(error ?? "Couldn't react");
+        }
+      } catch (err) {
+        // Revert.
+        dispatch({
+          type: "REPLACE_MESSAGE",
+          threadId,
+          tempId: messageId,
+          message: target,
+        });
+        toast.error(err instanceof Error ? err.message : "Couldn't react");
+      }
+    },
+    [threads, currentUser.id],
+  );
+
   const deleteMessage = useCallback(
     async (threadId: string, messageId: string) => {
       const thread = threads.find((t) => t.id === threadId);
@@ -617,6 +692,7 @@ export function CanvasStateProvider({
       setThreadPriority,
       moveThread,
       editMessage,
+      toggleReaction,
       deleteThread,
       deleteMessage,
     }),
@@ -628,6 +704,7 @@ export function CanvasStateProvider({
       setThreadPriority,
       moveThread,
       editMessage,
+      toggleReaction,
       deleteThread,
       deleteMessage,
     ],
@@ -672,6 +749,8 @@ function rowToMessage(row: Record<string, unknown>): CanvasMessage {
     content: String(row.content ?? ""),
     attachments: (row.attachments as unknown) ?? [],
     mentions: (row.mentions as string[] | null) ?? [],
+    reactions:
+      (row.reactions as Record<string, string[]> | null) ?? {},
     created_by: (row.created_by as string | null) ?? null,
     guest_name: (row.guest_name as string | null) ?? null,
     guest_email: (row.guest_email as string | null) ?? null,
