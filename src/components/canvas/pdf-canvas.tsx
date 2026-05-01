@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 import { Pin } from "@/components/canvas/pin";
 import { useCanvasStore } from "@/stores/canvas-store";
 import type { CanvasThread } from "@/components/canvas/types";
@@ -29,6 +30,8 @@ const PAGE_RENDER_SCALE = 1.5;
 export function PdfCanvas({ src, threads }: PdfCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const wrapperRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const pdfRef = useRef<PDFDocumentProxy | null>(null);
   const [pages, setPages] = useState<PageMeta[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,47 +47,50 @@ export function PdfCanvas({ src, threads }: PdfCanvasProps) {
     startPin,
   } = useCanvasStore();
 
-  // Load + render PDF pages on mount.
+  // Phase 1: load the PDF + collect page metadata. We do NOT render canvases
+  // here — wrappers don't exist in the DOM until setPages triggers a render.
   useEffect(() => {
     if (!src) return;
     let cancelled = false;
     setError(null);
     setPages([]);
+    pdfRef.current = null;
 
     (async () => {
       try {
-        const loadingTask = pdfjsLib.getDocument(src);
+        // standardFontDataUrl + cMapUrl point at /pdfjs/{standard_fonts,cmaps}/
+        // copied by scripts/copy-pdf-worker.mjs. Without these, PDFs that use
+        // CJK text or any of the 14 base fonts (ZapfDingbats etc.) fail to
+        // render with "Cannot load system font" and "standardFontDataUrl is
+        // undefined" warnings.
+        const loadingTask = pdfjsLib.getDocument({
+          url: src,
+          cMapUrl: "/pdfjs/cmaps/",
+          cMapPacked: true,
+          standardFontDataUrl: "/pdfjs/standard_fonts/",
+        });
         const pdf = await loadingTask.promise;
-        if (cancelled) return;
+        if (cancelled) {
+          await pdf.destroy().catch(() => undefined);
+          return;
+        }
 
         const metas: PageMeta[] = [];
         for (let p = 1; p <= pdf.numPages; p++) {
           const page = await pdf.getPage(p);
           const viewport = page.getViewport({ scale: PAGE_RENDER_SCALE });
-          const canvas = document.createElement("canvas");
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          canvas.dataset.pageNumber = String(p);
-          canvas.className = "block w-full select-none rounded-lg shadow-card";
-          canvas.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) continue;
-          await page.render({ canvasContext: ctx, viewport, canvas }).promise;
-          if (cancelled) return;
-          // Mount the canvas into the stage. We track meta for pin overlay.
-          const wrapper = document.querySelector(
-            `[data-page-wrapper="${p}"]`,
-          ) as HTMLDivElement | null;
-          if (wrapper) {
-            wrapper.replaceChildren(canvas);
-          }
           metas.push({
             pageNumber: p,
             width: viewport.width,
             height: viewport.height,
           });
         }
-        if (!cancelled) setPages(metas);
+        if (cancelled) {
+          await pdf.destroy().catch(() => undefined);
+          return;
+        }
+        pdfRef.current = pdf;
+        setPages(metas);
       } catch (err) {
         if (!cancelled) {
           console.error("[pdf]", err);
@@ -95,8 +101,50 @@ export function PdfCanvas({ src, threads }: PdfCanvasProps) {
 
     return () => {
       cancelled = true;
+      const pdf = pdfRef.current;
+      pdfRef.current = null;
+      if (pdf) void pdf.destroy().catch(() => undefined);
     };
   }, [src]);
+
+  // Phase 2: once wrappers are in the DOM, render each page into its wrapper.
+  // Runs after `pages` is populated so the refs map is reliably filled.
+  useEffect(() => {
+    const pdf = pdfRef.current;
+    if (!pdf || pages.length === 0) return;
+    let cancelled = false;
+
+    (async () => {
+      for (const meta of pages) {
+        const wrapper = wrapperRefs.current.get(meta.pageNumber);
+        if (!wrapper || cancelled) continue;
+        // Skip if we've already rendered (HMR / re-mount).
+        if (wrapper.querySelector("canvas")) continue;
+        try {
+          const page = await pdf.getPage(meta.pageNumber);
+          const viewport = page.getViewport({ scale: PAGE_RENDER_SCALE });
+          const canvas = document.createElement("canvas");
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          canvas.dataset.pageNumber = String(meta.pageNumber);
+          canvas.className =
+            "block w-full select-none rounded-lg shadow-card";
+          canvas.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) continue;
+          await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+          if (cancelled) return;
+          wrapper.replaceChildren(canvas);
+        } catch (err) {
+          console.error(`[pdf] page ${meta.pageNumber}`, err);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pages]);
 
   // Wheel zoom (with modifier).
   useEffect(() => {
@@ -172,10 +220,25 @@ export function PdfCanvas({ src, threads }: PdfCanvasProps) {
           return (
             <div
               key={p.pageNumber}
-              data-page-wrapper={p.pageNumber}
               className="relative"
               onClick={(e) => onPageClick(e, p.pageNumber)}
             >
+              {/* Canvas mount target — React leaves it empty; the render
+                  effect imperatively mounts a <canvas> element here so
+                  React's reconciler doesn't wipe the rendered bitmap. */}
+              <div
+                ref={(el) => {
+                  if (el) wrapperRefs.current.set(p.pageNumber, el);
+                  else wrapperRefs.current.delete(p.pageNumber);
+                }}
+                data-page-wrapper={p.pageNumber}
+                className="relative"
+                style={{
+                  aspectRatio: `${p.width} / ${p.height}`,
+                  background: "#fff",
+                  borderRadius: 8,
+                }}
+              />
               {pageThreads.map((t) => {
                 if (t.x_position == null || t.y_position == null) return null;
                 return (
