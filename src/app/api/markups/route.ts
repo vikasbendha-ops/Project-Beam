@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { kickWebsiteScreenshot } from "@/lib/apify/screenshot";
+import { PLAN_LIMITS, isPlan } from "@/lib/plan";
 
 const fileMeta = z
   .object({
@@ -53,6 +54,31 @@ export async function POST(request: NextRequest) {
       { error: "You don't have permission to create markups here." },
       { status: 403 },
     );
+  }
+
+  // Plan limit: free workspaces cap MarkUps. Trashed (deleted_at IS NOT NULL)
+  // rows don't count.
+  const { data: ws } = await supabase
+    .from("workspaces")
+    .select("plan")
+    .eq("id", workspace_id)
+    .maybeSingle();
+  const plan = ws?.plan && isPlan(ws.plan) ? ws.plan : "free";
+  const limit = PLAN_LIMITS[plan].markups;
+  if (limit !== null) {
+    const { count } = await supabase
+      .from("markups")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", workspace_id)
+      .is("deleted_at", null);
+    if ((count ?? 0) >= limit) {
+      return NextResponse.json(
+        {
+          error: `${plan.toUpperCase()} plan allows ${limit} MarkUps. Upgrade in Settings → Plan & billing to add more.`,
+        },
+        { status: 402 },
+      );
+    }
   }
 
   // Type-specific validation.

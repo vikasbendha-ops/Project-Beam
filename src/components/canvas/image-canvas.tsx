@@ -200,6 +200,69 @@ export function ImageCanvas({
     return () => el.removeEventListener("wheel", handler);
   }, [zoom, setZoom]);
 
+  // Touch pinch-zoom: two fingers spread/pinch zoom around the midpoint, with
+  // 2-finger drag panning. Single-finger touches fall through to native scroll
+  // so users can still scroll a zoomed-in image with one finger.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    let startDist = 0;
+    let startZoom = zoom;
+    let startMid = { x: 0, y: 0 };
+    let startScroll = { x: 0, y: 0 };
+
+    function dist(t1: Touch, t2: Touch) {
+      const dx = t1.clientX - t2.clientX;
+      const dy = t1.clientY - t2.clientY;
+      return Math.hypot(dx, dy);
+    }
+    function mid(t1: Touch, t2: Touch) {
+      return {
+        x: (t1.clientX + t2.clientX) / 2,
+        y: (t1.clientY + t2.clientY) / 2,
+      };
+    }
+
+    function onTouchStart(e: TouchEvent) {
+      if (e.touches.length !== 2 || !el) return;
+      e.preventDefault();
+      startDist = dist(e.touches[0], e.touches[1]);
+      startZoom = zoom;
+      const m = mid(e.touches[0], e.touches[1]);
+      const rect = el.getBoundingClientRect();
+      startMid = { x: m.x - rect.left, y: m.y - rect.top };
+      startScroll = { x: el.scrollLeft, y: el.scrollTop };
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      if (e.touches.length !== 2 || !el) return;
+      e.preventDefault();
+      const d = dist(e.touches[0], e.touches[1]);
+      if (startDist === 0) return;
+      const factor = d / startDist;
+      const next = Math.max(0.25, Math.min(4, startZoom * factor));
+      if (next === zoom) return;
+      const ratio = next / zoom;
+      const cursorX = startMid.x + startScroll.x;
+      const cursorY = startMid.y + startScroll.y;
+      const newCursorX = cursorX * ratio;
+      const newCursorY = cursorY * ratio;
+      setZoom(next);
+      requestAnimationFrame(() => {
+        if (!el) return;
+        el.scrollLeft = newCursorX - startMid.x;
+        el.scrollTop = newCursorY - startMid.y;
+      });
+    }
+
+    el.addEventListener("touchstart", onTouchStart, { passive: false });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+    };
+  }, [zoom, setZoom]);
+
   // Hold-Space or middle-mouse to pan. We pan by adjusting the container's
   // scrollLeft / scrollTop so it composes with the native scroll behaviour
   // (no transforms, no jank).

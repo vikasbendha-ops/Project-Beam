@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import {
@@ -11,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { NewWorkspaceModal } from "./new-workspace-modal";
 
 export interface WorkspaceSummary {
   id: string;
@@ -28,60 +30,75 @@ export function WorkspaceSwitcher({
   current,
   workspaces,
 }: WorkspaceSwitcherProps) {
-  const owned = workspaces.filter((w) => !current.is_personal || w.id === current.id || !w.is_personal);
-  const shared = workspaces.filter((w) => w.is_personal && w.id !== current.id);
+  const [createOpen, setCreateOpen] = useState(false);
+  const personal = workspaces.filter((w) => w.is_personal);
+  const teams = workspaces.filter((w) => !w.is_personal);
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger className="flex w-full items-center gap-2.5 rounded-xl border border-transparent px-2.5 py-2 text-left transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-          {current.initials ?? current.name.slice(0, 2).toUpperCase()}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-foreground">
-            {current.name}
-          </p>
-          <p className="truncate text-[11px] font-medium text-muted-foreground">
-            {current.is_personal ? "Personal" : "Team"}
-          </p>
-        </div>
-        <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-64">
-        <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Your workspaces
-        </DropdownMenuLabel>
-        {owned.map((w) => (
-          <WorkspaceItem
-            key={w.id}
-            workspace={w}
-            currentId={current.id}
-          />
-        ))}
-        {shared.length > 0 ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Shared with you
-            </DropdownMenuLabel>
-            {shared.map((w) => (
-              <WorkspaceItem
-                key={w.id}
-                workspace={w}
-                currentId={current.id}
-              />
-            ))}
-          </>
-        ) : null}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/welcome" className="flex items-center gap-2">
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger className="flex w-full items-center gap-2.5 rounded-xl border border-transparent px-2.5 py-2 text-left transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
+            {current.initials ?? current.name.slice(0, 2).toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-foreground">
+              {current.name}
+            </p>
+            <p className="truncate text-[11px] font-medium text-muted-foreground">
+              {current.is_personal ? "Personal" : "Team"}
+            </p>
+          </div>
+          <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-64">
+          {personal.length > 0 ? (
+            <>
+              <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Personal
+              </DropdownMenuLabel>
+              {personal.map((w) => (
+                <WorkspaceItem
+                  key={w.id}
+                  workspace={w}
+                  currentId={current.id}
+                />
+              ))}
+            </>
+          ) : null}
+          {teams.length > 0 ? (
+            <>
+              {personal.length > 0 ? <DropdownMenuSeparator /> : null}
+              <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Teams
+              </DropdownMenuLabel>
+              {teams.map((w) => (
+                <WorkspaceItem
+                  key={w.id}
+                  workspace={w}
+                  currentId={current.id}
+                />
+              ))}
+            </>
+          ) : null}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              setCreateOpen(true);
+            }}
+            className="flex items-center gap-2"
+          >
             <Plus className="size-4" />
-            New MarkUp
-          </Link>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+            New workspace
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <NewWorkspaceModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+      />
+    </>
   );
 }
 

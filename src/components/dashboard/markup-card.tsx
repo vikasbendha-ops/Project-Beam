@@ -161,7 +161,7 @@ export function MarkupCard({
       toast.error(error ?? "Delete failed");
       return;
     }
-    toast.success("Deleted");
+    toast.success("Moved to trash");
     setDeleteOpen(false);
     router.refresh();
   }
@@ -426,10 +426,10 @@ export function MarkupCard({
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Delete &ldquo;{markup.title}&rdquo;?</DialogTitle>
+            <DialogTitle>Move &ldquo;{markup.title}&rdquo; to trash?</DialogTitle>
             <DialogDescription>
-              This permanently removes the MarkUp, all comments, threads, and
-              versions. This can&rsquo;t be undone.
+              The MarkUp moves to trash for 30 days. Restore from Settings →
+              Danger zone → Open trash within that window.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -447,7 +447,7 @@ export function MarkupCard({
               onClick={handleDelete}
               disabled={deleting}
             >
-              {deleting ? "Deleting…" : "Delete"}
+              {deleting ? "Moving…" : "Move to trash"}
             </Button>
           </DialogFooter>
         </DialogContent>

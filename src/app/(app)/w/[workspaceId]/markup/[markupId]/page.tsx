@@ -31,6 +31,7 @@ export default async function MarkupCanvasPage({ params }: MarkupPageProps) {
         "id, title, type, status, source_url, thumbnail_url, workspace_id, folder_id, created_by, archived",
       )
       .eq("id", markupId)
+      .is("deleted_at", null)
       .maybeSingle(),
   ]);
 
@@ -44,6 +45,7 @@ export default async function MarkupCanvasPage({ params }: MarkupPageProps) {
     .select("id, title, type, thumbnail_url, archived, status")
     .eq("workspace_id", workspaceId)
     .eq("archived", false)
+    .is("deleted_at", null)
     .order("created_at", { ascending: true });
 
   const [

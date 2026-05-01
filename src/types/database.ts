@@ -193,6 +193,7 @@ export type Database = {
           archived: boolean
           created_at: string
           created_by: string
+          deleted_at: string | null
           folder_id: string | null
           id: string
           source_url: string | null
@@ -209,6 +210,7 @@ export type Database = {
           archived?: boolean
           created_at?: string
           created_by: string
+          deleted_at?: string | null
           folder_id?: string | null
           id?: string
           source_url?: string | null
@@ -225,6 +227,7 @@ export type Database = {
           archived?: boolean
           created_at?: string
           created_by?: string
+          deleted_at?: string | null
           folder_id?: string | null
           id?: string
           source_url?: string | null
@@ -811,31 +814,43 @@ export type Database = {
       workspaces: {
         Row: {
           avatar_url: string | null
+          billing_customer_id: string | null
           created_at: string
           id: string
           is_personal: boolean
           name: string
           owner_id: string
+          plan: string
+          plan_renews_at: string | null
+          plan_seats: number
           slug: string | null
           updated_at: string
         }
         Insert: {
           avatar_url?: string | null
+          billing_customer_id?: string | null
           created_at?: string
           id?: string
           is_personal?: boolean
           name: string
           owner_id: string
+          plan?: string
+          plan_renews_at?: string | null
+          plan_seats?: number
           slug?: string | null
           updated_at?: string
         }
         Update: {
           avatar_url?: string | null
+          billing_customer_id?: string | null
           created_at?: string
           id?: string
           is_personal?: boolean
           name?: string
           owner_id?: string
+          plan?: string
+          plan_renews_at?: string | null
+          plan_seats?: number
           slug?: string | null
           updated_at?: string
         }
