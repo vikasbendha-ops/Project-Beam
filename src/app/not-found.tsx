@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { ArrowLeft, Compass } from "lucide-react";
 
 export const metadata = {
   title: "Not found · Beam",
@@ -7,37 +6,134 @@ export const metadata = {
 
 export default function NotFound() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-6 py-16">
-      <div className="w-full max-w-md text-center">
-        <div className="mx-auto mb-6 flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          <Compass className="size-7" strokeWidth={1.5} />
-        </div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-          404
-        </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">
-          We can&rsquo;t find that page
-        </h1>
-        <p className="mt-3 text-sm text-muted-foreground">
-          The link may be broken, or the MarkUp / workspace was moved or
-          deleted. Head back and try again.
-        </p>
-        <div className="mt-8 flex items-center justify-center gap-3">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+    <div className="editorial relative flex min-h-screen items-center justify-center overflow-hidden p-6">
+      <div className="grain absolute inset-0" />
+
+      {/* Registration marks at corners */}
+      <Reg className="left-6 top-6" />
+      <Reg className="right-6 top-6" />
+      <Reg className="left-6 bottom-6" />
+      <Reg className="right-6 bottom-6" />
+
+      <article className="relative z-10 w-full max-w-[820px] border-2 border-[var(--rule)] bg-paper p-8 shadow-[6px_6px_0_0_var(--ink)] sm:p-12">
+        {/* Slip header */}
+        <header className="flex items-center justify-between border-b-[3px] border-[var(--rule)] pb-4">
+          <p className="mono text-[10px] tracking-[0.22em] uppercase ink-faint">
+            Beam · System slip · Form 404-A
+          </p>
+          <p className="mono text-[10px] tracking-[0.22em] uppercase ink-faint">
+            Filed {new Date().toLocaleDateString("en-GB")}
+          </p>
+        </header>
+
+        {/* Big tag */}
+        <div className="mt-10 grid grid-cols-12 items-end gap-4 stagger">
+          <p className="col-span-12 md:col-span-3 mono text-[11px] tracking-[0.22em] uppercase ink-faint">
+            Subject
+          </p>
+          <h1
+            className="col-span-12 md:col-span-9 display"
+            style={{
+              fontSize: "clamp(96px, 18vw, 240px)",
+              fontVariationSettings: "'opsz' 144, 'SOFT' 0, 'WONK' 1",
+              letterSpacing: "-0.04em",
+              color: "var(--accent)",
+            }}
           >
-            <ArrowLeft className="size-4" />
-            Back to home
-          </Link>
-          <Link
-            href="/help"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
-          >
-            Visit help center
-          </Link>
+            404
+          </h1>
         </div>
-      </div>
-    </main>
+
+        <div className="hairline-thick mt-6" />
+
+        <div className="mt-8 grid grid-cols-12 items-baseline gap-4">
+          <p className="col-span-12 md:col-span-3 mono text-[11px] tracking-[0.22em] uppercase ink-faint">
+            Status
+          </p>
+          <p
+            className="col-span-12 md:col-span-9 display"
+            style={{ fontSize: "clamp(32px, 4.6vw, 64px)" }}
+          >
+            We can&rsquo;t find{" "}
+            <span className="serif-italic">that page.</span>
+          </p>
+        </div>
+
+        <div className="mt-6 grid grid-cols-12 gap-4">
+          <p className="col-span-12 md:col-span-3 mono text-[11px] tracking-[0.22em] uppercase ink-faint">
+            Likely cause
+          </p>
+          <ul className="col-span-12 md:col-span-9 space-y-2 text-[15px] leading-[1.6] ink-soft">
+            <li className="flex items-baseline gap-3">
+              <span className="mono text-[11px] tracking-[0.18em] ink-faint">
+                ▢
+              </span>
+              The link is broken or mistyped.
+            </li>
+            <li className="flex items-baseline gap-3">
+              <span className="mono text-[11px] tracking-[0.18em] ink-faint">
+                ▢
+              </span>
+              The MarkUp was deleted or moved to trash.
+            </li>
+            <li className="flex items-baseline gap-3">
+              <span className="mono text-[11px] tracking-[0.18em] ink-faint">
+                ☑
+              </span>
+              The workspace was renamed or you don&rsquo;t have access.
+            </li>
+          </ul>
+        </div>
+
+        {/* Stamp + actions */}
+        <div className="mt-12 grid grid-cols-12 items-end gap-6 border-t-[3px] border-[var(--rule)] pt-6">
+          <div className="col-span-12 md:col-span-7 flex flex-wrap gap-2.5">
+            <Link
+              href="/"
+              className="press inline-flex items-center bg-ink px-5 py-2.5 text-[12px] smallcaps"
+            >
+              ← Return to home
+            </Link>
+            <Link
+              href="/help"
+              className="inline-flex items-center px-4 py-2.5 text-[12px] smallcaps ink underline decoration-[var(--rule)] decoration-2 underline-offset-4 hover:decoration-[var(--accent)]"
+            >
+              Visit help center
+            </Link>
+          </div>
+          <div className="col-span-12 md:col-span-5 md:text-right">
+            <Stamp />
+          </div>
+        </div>
+
+        {/* Footer ribbon */}
+        <footer className="mt-8 flex items-center justify-between border-t border-dotted border-[var(--rule)]/60 pt-3 mono text-[10px] tracking-[0.22em] uppercase ink-faint">
+          <span>Routing slip / not for replication</span>
+          <span>Beam.app/404</span>
+        </footer>
+      </article>
+    </div>
+  );
+}
+
+function Reg({ className }: { className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={"absolute mono text-[18px] ink-faint " + (className ?? "")}
+    >
+      +
+    </span>
+  );
+}
+
+function Stamp() {
+  return (
+    <span
+      className="inline-block rotate-[-6deg] border-[3px] border-[var(--accent)] px-3 py-2 mono text-[12px] tracking-[0.22em] uppercase"
+      style={{ color: "var(--accent)" }}
+    >
+      Page · void
+    </span>
   );
 }
