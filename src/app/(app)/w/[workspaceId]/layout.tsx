@@ -107,7 +107,7 @@ export default async function WorkspaceLayout({
             current={current}
             workspaces={workspaces}
             folders={folders}
-            className="hidden h-full w-full md:flex"
+            className="hidden md:flex"
           />
         }
         topNav={

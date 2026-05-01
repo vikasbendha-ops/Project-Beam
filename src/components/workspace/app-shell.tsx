@@ -92,10 +92,12 @@ export function AppShell({
         )}
       />
 
-      {/* Sidebar overlay — slides in from the left. */}
+      {/* Sidebar overlay — slides in from the left. The sidebar self-sizes
+          to 280px; the wrapper just animates the slide so we don't override
+          its intrinsic width. */}
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-50 hidden w-[260px] transition-transform duration-200 md:block",
+          "fixed inset-y-0 left-0 z-50 hidden transition-transform duration-200 md:block",
           focusMenuOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
@@ -103,8 +105,8 @@ export function AppShell({
       </div>
 
       {/* TopNav overlay — pinned to the right of the sidebar slot, slides
-          down from the top. Stays at left:260 even when the sidebar is
-          tucked away so the bar's translate-Y animation runs cleanly. */}
+          down. Stays at left:280 even when the sidebar is tucked away so
+          the translate-Y animation runs cleanly. */}
       <div
         className={cn(
           "fixed top-0 right-0 z-50 hidden transition-transform duration-200 md:block",
@@ -112,7 +114,7 @@ export function AppShell({
             ? "translate-y-0"
             : "pointer-events-none -translate-y-full",
         )}
-        style={{ left: 260 }}
+        style={{ left: 280 }}
       >
         {topNav}
       </div>
