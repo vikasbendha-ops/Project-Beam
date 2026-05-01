@@ -11,8 +11,10 @@ interface ImageCanvasProps {
   alt?: string;
   threads: CanvasThread[];
   pinSize?: number;
-  /** Render-prop for popover content (active thread). Returns absolute-positioned children. */
-  renderOverlay?: () => React.ReactNode;
+  /** Render-prop for popover content (active thread + pending pin composer).
+   *  Receives the page number so the same prop can be reused by PDF (which
+   *  renders one overlay per page). For images, always called with 1. */
+  renderOverlay?: (pageNumber: number) => React.ReactNode;
 }
 
 /**
@@ -308,7 +310,7 @@ export function ImageCanvas({
                 }}
               />
             ) : null}
-            {renderOverlay?.()}
+            {renderOverlay?.(1)}
           </>
         ) : null}
       </div>

@@ -13,6 +13,9 @@ interface OfficeCanvasProps {
   /** File-name suffix used for the "open in new tab" affordance. */
   fileName?: string | null;
   threads: CanvasThread[];
+  /** Page-scoped overlay slot. Office docs collapse to a single page so
+   *  this is always called with pageNumber=1. */
+  renderOverlay?: (pageNumber: number) => React.ReactNode;
 }
 
 /**
@@ -25,7 +28,12 @@ interface OfficeCanvasProps {
  * follow the file's scroll position rather than a specific paragraph. For
  * paragraph-anchored feedback, export to PDF first.
  */
-export function OfficeCanvas({ src, fileName, threads }: OfficeCanvasProps) {
+export function OfficeCanvas({
+  src,
+  fileName,
+  threads,
+  renderOverlay,
+}: OfficeCanvasProps) {
   const mode = useCanvasStore((s) => s.mode);
   const activeThreadId = useCanvasStore((s) => s.activeThreadId);
   const setActiveThread = useCanvasStore((s) => s.setActiveThread);
@@ -144,6 +152,7 @@ export function OfficeCanvas({ src, fileName, threads }: OfficeCanvasProps) {
               }}
             />
           ) : null}
+          {renderOverlay?.(1)}
         </div>
       </div>
     </div>

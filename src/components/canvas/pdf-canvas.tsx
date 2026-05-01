@@ -17,6 +17,15 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 interface PdfCanvasProps {
   src: string | null;
   threads: CanvasThread[];
+  /** Per-page overlay slot. Each call receives a 1-based page number; the
+   *  returned nodes are mounted INSIDE that page's wrapper, so any
+   *  absolutely-positioned children resolve their %-coords against the
+   *  page. CanvasViewer uses this to mount the pending-pin composer and
+   *  active thread popover on the correct page. */
+  renderOverlay?: (pageNumber: number) => React.ReactNode;
+  /** Fires once when page 1's bitmap finishes rendering. Used to capture
+   *  a thumbnail for the dashboard / sibling rail. */
+  onFirstPageRendered?: (canvas: HTMLCanvasElement) => void;
 }
 
 interface PageMeta {
@@ -27,7 +36,12 @@ interface PageMeta {
 
 const PAGE_RENDER_SCALE = 1.5;
 
-export function PdfCanvas({ src, threads }: PdfCanvasProps) {
+export function PdfCanvas({
+  src,
+  threads,
+  renderOverlay,
+  onFirstPageRendered,
+}: PdfCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const wrapperRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -135,6 +149,13 @@ export function PdfCanvas({ src, threads }: PdfCanvasProps) {
           await page.render({ canvasContext: ctx, viewport, canvas }).promise;
           if (cancelled) return;
           wrapper.replaceChildren(canvas);
+          if (meta.pageNumber === 1 && onFirstPageRendered) {
+            try {
+              onFirstPageRendered(canvas);
+            } catch (cbErr) {
+              console.error("[pdf] thumbnail callback failed", cbErr);
+            }
+          }
         } catch (err) {
           console.error(`[pdf] page ${meta.pageNumber}`, err);
         }
@@ -144,7 +165,7 @@ export function PdfCanvas({ src, threads }: PdfCanvasProps) {
     return () => {
       cancelled = true;
     };
-  }, [pages]);
+  }, [pages, onFirstPageRendered]);
 
   // Wheel zoom (with modifier).
   useEffect(() => {
@@ -265,6 +286,9 @@ export function PdfCanvas({ src, threads }: PdfCanvasProps) {
                   }}
                 />
               ) : null}
+              {/* Page-scoped overlay: composer + active thread popover. The
+                  consumer decides what to render based on the page number. */}
+              {renderOverlay?.(p.pageNumber)}
             </div>
           );
         })}

@@ -12,6 +12,8 @@ interface TextCanvasProps {
   /** "text/plain" | "text/markdown" | "text/csv" — affects rendering. */
   mime?: string | null;
   threads: CanvasThread[];
+  /** Page-scoped overlay slot. Text files have one page; always 1. */
+  renderOverlay?: (pageNumber: number) => React.ReactNode;
 }
 
 /**
@@ -22,7 +24,12 @@ interface TextCanvasProps {
  * we keep it as monospace to preserve line numbering and indent). For full
  * MD rendering, swap this for a `react-markdown` setup later.
  */
-export function TextCanvas({ src, mime, threads }: TextCanvasProps) {
+export function TextCanvas({
+  src,
+  mime,
+  threads,
+  renderOverlay,
+}: TextCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [text, setText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -137,6 +144,7 @@ export function TextCanvas({ src, mime, threads }: TextCanvasProps) {
           }}
         />
       ) : null}
+      {renderOverlay?.(1)}
     </div>
   );
 }

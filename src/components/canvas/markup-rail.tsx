@@ -102,6 +102,22 @@ export function MarkupRail({
                       sizes="160px"
                       className="object-cover"
                     />
+                  ) : s.type === "website" ? (
+                    // Website screenshots are produced async by Apify. Until
+                    // the webhook lands, surface a "rendering" state instead
+                    // of a silent icon so users understand what's happening.
+                    <div className="flex h-full flex-col items-center justify-center gap-1 text-muted-foreground">
+                      <Globe className="size-5 animate-pulse" strokeWidth={1.25} />
+                      <span className="text-[9px] font-semibold uppercase tracking-wider">
+                        rendering…
+                      </span>
+                    </div>
+                  ) : s.type === "pdf" ? (
+                    // PDF thumbnails generate on first canvas open; if none
+                    // yet, show the file icon.
+                    <div className="flex h-full items-center justify-center text-muted-foreground">
+                      <Icon className="size-5" strokeWidth={1.25} />
+                    </div>
                   ) : (
                     <div className="flex h-full items-center justify-center text-muted-foreground">
                       <Icon className="size-5" strokeWidth={1.25} />

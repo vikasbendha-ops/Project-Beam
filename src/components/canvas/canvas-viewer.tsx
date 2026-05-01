@@ -106,6 +106,7 @@ function CanvasViewerInner({
 }) {
   const isMobile = useIsMobile();
   const activeThreadId = useCanvasStore((s) => s.activeThreadId);
+  const pendingPin = useCanvasStore((s) => s.pendingPin);
   const sidebarCollapsed = useCanvasStore((s) => s.sidebarCollapsed);
   const { threads } = useCanvasMutators();
 
@@ -117,6 +118,55 @@ function CanvasViewerInner({
   // the actual renderer by the version's mime_type.
   const docCategory = categoryFromMime(version?.mime_type);
   const isDocument = markup.type === "pdf";
+
+  // Page-scoped overlay: returned children are mounted INSIDE the canvas's
+  // page wrapper, so absolute %-coords resolve against that page. Used by
+  // PDF (per page), and by image/office/text (always page 1).
+  const renderOverlay = (page: number) => {
+    const composerHere =
+      pendingPin && (pendingPin.pageNumber ?? 1) === page;
+    const popoverHere =
+      activeThread && (activeThread.page_number ?? 1) === page;
+    return (
+      <>
+        {composerHere ? (
+          <PendingPinComposer
+            markupId={markup.id}
+            versionId={version?.id ?? null}
+          />
+        ) : null}
+        {popoverHere ? (
+          <ThreadPopover
+            thread={activeThread}
+            profiles={profileMap}
+            currentUser={currentUser}
+          />
+        ) : null}
+      </>
+    );
+  };
+
+  // Fire a one-shot thumbnail capture for the first PDF page so the
+  // sibling rail + dashboard cards stop showing the generic icon. Skip if
+  // we've already attempted it this session (sessionStorage guard).
+  const onPdfFirstRendered = (canvas: HTMLCanvasElement) => {
+    const key = `beam:thumb:${markup.id}`;
+    if (typeof window !== "undefined" && window.sessionStorage.getItem(key))
+      return;
+    if (typeof window !== "undefined") window.sessionStorage.setItem(key, "1");
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return;
+        void fetch(`/api/markups/${markup.id}/thumbnail`, {
+          method: "POST",
+          headers: { "content-type": "image/png" },
+          body: blob,
+        }).catch(() => undefined);
+      },
+      "image/png",
+      0.85,
+    );
+  };
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-muted">
@@ -151,36 +201,29 @@ function CanvasViewerInner({
               src={markup.canvasUrl}
               fileName={version?.file_name}
               threads={threads}
+              renderOverlay={renderOverlay}
             />
           ) : isDocument && docCategory === "text" ? (
             <TextCanvas
               src={markup.canvasUrl}
               mime={version?.mime_type}
               threads={threads}
+              renderOverlay={renderOverlay}
             />
           ) : isDocument ? (
-            <PdfCanvas src={markup.canvasUrl} threads={threads} />
+            <PdfCanvas
+              src={markup.canvasUrl}
+              threads={threads}
+              renderOverlay={renderOverlay}
+              onFirstPageRendered={onPdfFirstRendered}
+            />
           ) : (
             <ImageCanvas
               src={markup.canvasUrl}
               alt={markup.title}
               threads={threads}
               pinSize={isMobile ? 32 : 28}
-              renderOverlay={() => (
-                <>
-                  <PendingPinComposer
-                    markupId={markup.id}
-                    versionId={version?.id ?? null}
-                  />
-                  {activeThread ? (
-                    <ThreadPopover
-                      thread={activeThread}
-                      profiles={profileMap}
-                      currentUser={currentUser}
-                    />
-                  ) : null}
-                </>
-              )}
+              renderOverlay={renderOverlay}
             />
           )}
           <ZoomControls />

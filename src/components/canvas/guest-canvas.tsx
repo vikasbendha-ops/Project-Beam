@@ -118,6 +118,7 @@ export function GuestCanvas({
   // When a thread is activated from the comment list (mobile especially),
   // close the left drawer so the popover is visible.
   const activeThreadId = useCanvasStore((s) => s.activeThreadId);
+  const pendingPin = useCanvasStore((s) => s.pendingPin);
   useEffect(() => {
     if (activeThreadId && isMobile) setLeftOpen(false);
   }, [activeThreadId, isMobile]);
@@ -210,12 +211,29 @@ export function GuestCanvas({
         <main className="relative flex flex-1 overflow-hidden">
           {(() => {
             const docCategory = categoryFromMime(version?.mime_type);
+            // Single overlay slot reused across all renderers — composer
+            // only mounts on the page where the user dropped a pending
+            // pin, and only when the share link permits comments.
+            const guestOverlay = (page: number) => {
+              if (!canComment) return null;
+              const pinHere =
+                pendingPin && (pendingPin.pageNumber ?? 1) === page;
+              if (!pinHere) return null;
+              return (
+                <GuestPinComposer
+                  shareToken={shareToken}
+                  identity={identity}
+                  requestIdentity={() => setPrompt(true)}
+                />
+              );
+            };
             if (markup.type === "pdf" && docCategory === "office") {
               return (
                 <OfficeCanvas
                   src={markup.canvasUrl}
                   fileName={version?.file_name}
                   threads={threads}
+                  renderOverlay={guestOverlay}
                 />
               );
             }
@@ -225,11 +243,18 @@ export function GuestCanvas({
                   src={markup.canvasUrl}
                   mime={version?.mime_type}
                   threads={threads}
+                  renderOverlay={guestOverlay}
                 />
               );
             }
             if (markup.type === "pdf") {
-              return <PdfCanvas src={markup.canvasUrl} threads={threads} />;
+              return (
+                <PdfCanvas
+                  src={markup.canvasUrl}
+                  threads={threads}
+                  renderOverlay={guestOverlay}
+                />
+              );
             }
             return (
               <ImageCanvas
@@ -237,15 +262,7 @@ export function GuestCanvas({
                 alt={markup.title}
                 threads={threads}
                 pinSize={isMobile ? 32 : 28}
-                renderOverlay={() =>
-                  canComment ? (
-                    <GuestPinComposer
-                      shareToken={shareToken}
-                      identity={identity}
-                      requestIdentity={() => setPrompt(true)}
-                    />
-                  ) : null
-                }
+                renderOverlay={guestOverlay}
               />
             );
           })()}

@@ -197,6 +197,13 @@ export function MarkupCard({ markup, workspaceId }: MarkupCardProps) {
                 sizes="(max-width: 768px) 100vw, (max-width: 1280px) 33vw, 25vw"
                 draggable={false}
               />
+            ) : markup.type === "website" ? (
+              <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-muted-foreground">
+                <Globe className="size-10 animate-pulse" strokeWidth={1.25} />
+                <span className="text-[10px] font-semibold uppercase tracking-wider">
+                  Rendering screenshot…
+                </span>
+              </div>
             ) : (
               <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                 <TypeIcon className="size-10" strokeWidth={1.25} />
