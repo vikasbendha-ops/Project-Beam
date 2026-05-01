@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Activity,
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
@@ -17,6 +18,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/dashboard/status-pill";
+import { ActivityDrawer } from "@/components/canvas/activity-drawer";
 import { ShareModal } from "@/components/canvas/share-modal";
 import { ShortcutsHelp } from "@/components/canvas/shortcuts-help";
 import { StatusMenu } from "@/components/canvas/status-menu";
@@ -54,6 +56,7 @@ export function CanvasTopBar({
   const focusMenuOpen = useUIStore((s) => s.focusMenuOpen);
   const setFocusMenuOpen = useUIStore((s) => s.setFocusMenuOpen);
   const [shareOpen, setShareOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
   const canApprove = currentUser.role !== "guest";
   const canShare = currentUser.role !== "guest";
 
@@ -272,6 +275,17 @@ export function CanvasTopBar({
         {canShare ? (
           <>
             <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="hidden md:inline-flex"
+              aria-label="Activity log"
+              onClick={() => setActivityOpen(true)}
+            >
+              <Activity className="size-4" />
+              <span className="hidden lg:inline">Activity</span>
+            </Button>
+            <Button
               asChild
               type="button"
               variant="ghost"
@@ -314,6 +328,11 @@ export function CanvasTopBar({
         markupTitle={markup.title}
       />
       <ShortcutsHelp canApprove={canApprove} />
+      <ActivityDrawer
+        markupId={markup.id}
+        open={activityOpen}
+        onClose={() => setActivityOpen(false)}
+      />
     </header>
   );
 }

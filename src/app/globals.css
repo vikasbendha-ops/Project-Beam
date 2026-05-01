@@ -31,6 +31,9 @@
   --color-primary-hover: #4338CA;
   --color-primary-subtle: #EEF2FF;
   --color-surface: #FFFFFF;
+  /* Tonal layer above the canvas — used by elevated cards / popovers
+     to stack against `card`. Per Stitch "Tonal Layers" guidance. */
+  --color-surface-elevated: #FAFAF9;
   --color-border-strong: #D6D3D1;
   --color-text-primary: #1C1917;
   --color-text-secondary: #57534E;
@@ -41,7 +44,7 @@
   --color-status-approved: #10B981;
   --color-danger: #DC2626;
 
-  /* Radii */
+  /* Radii — calibrated to Stitch spec (button 10, card 14, modal 18). */
   --radius: 0.625rem;
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -52,13 +55,15 @@
   --radius-card: 14px;
   --radius-modal: 18px;
 
-  /* Shadows */
+  /* Shadows — paired tight + soft, per "Level 2 Cards" spec. */
   --shadow-card: 0 1px 2px rgba(28, 25, 23, 0.04), 0 4px 12px rgba(28, 25, 23, 0.05);
   --shadow-modal: 0 8px 32px rgba(28, 25, 23, 0.12);
   --shadow-pin: 0 2px 6px rgba(28, 25, 23, 0.18);
 }
 
 :root {
+  /* Warm-stone neutrals — slightly off-white background creates a
+     calmer, more editorial feel than pure greyscale. */
   --background: #FAFAF9;
   --foreground: #1C1917;
   --card: #FFFFFF;
@@ -86,8 +91,62 @@
   }
   html {
     @apply font-sans;
+    /* Tabular numerals everywhere — stops digits from jumping when
+       counts (comment count, file size, version number) update. */
+    font-variant-numeric: tabular-nums;
   }
   body {
     @apply bg-background text-foreground antialiased;
+    /* Smoother SF-like font rendering; pairs with antialiased. */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  /* Brand-tinted text selection. Anchored to the indigo primary so
+     even on white surfaces the highlight reads as Beam, not browser
+     default blue. */
+  ::selection {
+    background: rgba(79, 70, 229, 0.18);
+    color: inherit;
+  }
+  /* Focus visible everywhere — shadcn ships this on most components,
+     but custom buttons (filter pills etc.) need a fallback. */
+  :where(button, [role="button"], a, input, textarea, select):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+  /* Scrollbar — quiet by default, primary on hover. */
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(168, 162, 158, 0.4);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(79, 70, 229, 0.5);
+    background-clip: padding-box;
+    border: 2px solid transparent;
+  }
+}
+
+/* Respect users who prefer reduced motion. We can't catch every
+   framer-motion animation here, but disabling CSS animations + the
+   default transition baseline cuts the bulk of perceived motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
