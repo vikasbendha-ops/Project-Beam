@@ -14,6 +14,7 @@ import { ThreadPopover } from "@/components/canvas/thread-popover";
 import { ZoomControls } from "@/components/canvas/zoom-controls";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useCanvasStore } from "@/stores/canvas-store";
+import { categoryFromMime } from "@/lib/mime";
 import { cn } from "@/lib/utils";
 import type {
   CanvasCurrentUser,
@@ -26,7 +27,16 @@ import type {
 
 const PdfCanvas = dynamic(
   () => import("@/components/canvas/pdf-canvas").then((m) => m.PdfCanvas),
-  { ssr: false, loading: () => <CanvasLoading /> },
+  { ssr: false, loading: () => <CanvasLoading label="Loading PDF…" /> },
+);
+const OfficeCanvas = dynamic(
+  () =>
+    import("@/components/canvas/office-canvas").then((m) => m.OfficeCanvas),
+  { ssr: false, loading: () => <CanvasLoading label="Loading document…" /> },
+);
+const TextCanvas = dynamic(
+  () => import("@/components/canvas/text-canvas").then((m) => m.TextCanvas),
+  { ssr: false, loading: () => <CanvasLoading label="Loading…" /> },
 );
 
 interface CanvasViewerProps {
@@ -103,7 +113,10 @@ function CanvasViewerInner({
     ? threads.find((t) => t.id === activeThreadId) ?? null
     : null;
 
-  const isPdf = markup.type === "pdf";
+  // The DB enum buckets PDF / office / text uploads under `pdf`. Discriminate
+  // the actual renderer by the version's mime_type.
+  const docCategory = categoryFromMime(version?.mime_type);
+  const isDocument = markup.type === "pdf";
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-muted">
@@ -133,7 +146,19 @@ function CanvasViewerInner({
           />
         ) : null}
         <main className="relative flex flex-1 overflow-hidden">
-          {isPdf ? (
+          {isDocument && docCategory === "office" ? (
+            <OfficeCanvas
+              src={markup.canvasUrl}
+              fileName={version?.file_name}
+              threads={threads}
+            />
+          ) : isDocument && docCategory === "text" ? (
+            <TextCanvas
+              src={markup.canvasUrl}
+              mime={version?.mime_type}
+              threads={threads}
+            />
+          ) : isDocument ? (
             <PdfCanvas src={markup.canvasUrl} threads={threads} />
           ) : (
             <ImageCanvas
@@ -180,10 +205,10 @@ function CanvasViewerInner({
   );
 }
 
-function CanvasLoading() {
+function CanvasLoading({ label = "Loading…" }: { label?: string }) {
   return (
     <div className="flex h-full w-full items-center justify-center">
-      <div className="text-sm text-muted-foreground">Loading PDF…</div>
+      <div className="text-sm text-muted-foreground">{label}</div>
     </div>
   );
 }

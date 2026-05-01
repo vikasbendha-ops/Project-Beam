@@ -7,8 +7,11 @@ import { useCanvasStore } from "@/stores/canvas-store";
 import type { CanvasThread } from "@/components/canvas/types";
 import { cn } from "@/lib/utils";
 
-// pdfjs needs a worker URL. Load from the same package's CDN-friendly path.
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+// pdf.js needs a worker URL. We bundle the matching worker from the
+// installed pdfjs-dist version into /public via scripts/copy-pdf-worker.mjs
+// (runs on predev / prebuild / postinstall). This avoids version-mismatch
+// 404s from cdnjs/unpkg and serves the worker from the same origin.
+pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
 interface PdfCanvasProps {
   src: string | null;

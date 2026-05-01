@@ -3,20 +3,12 @@ import { z } from "zod";
 import { nanoid } from "nanoid";
 import { createClient } from "@/lib/supabase/server";
 import { MAX_UPLOAD_BYTES } from "@/lib/constants";
-
-const ALLOWED_MIMES = [
-  "image/png",
-  "image/jpeg",
-  "image/gif",
-  "image/webp",
-  "image/svg+xml",
-  "application/pdf",
-] as const;
+import { ACCEPTED_UPLOAD_MIMES } from "@/lib/mime";
 
 const bodySchema = z.object({
   workspace_id: z.string().uuid(),
   filename: z.string().min(1).max(200),
-  mime_type: z.enum(ALLOWED_MIMES),
+  mime_type: z.enum(ACCEPTED_UPLOAD_MIMES),
   size: z.number().int().positive().max(MAX_UPLOAD_BYTES),
 });
 

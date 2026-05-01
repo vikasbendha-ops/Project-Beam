@@ -6,9 +6,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   AlertCircle,
+  FileSpreadsheet,
   FileText,
+  FileType,
   Image as ImageIcon,
   Loader2,
+  Presentation,
   UploadCloud,
   X,
 } from "lucide-react";
@@ -32,17 +35,15 @@ import {
   type UrlMarkupInput,
 } from "@/lib/validations/markup";
 import { MAX_UPLOAD_BYTES } from "@/lib/constants";
+import {
+  ACCEPTED_UPLOAD_MIMES,
+  categoryFromFile,
+  markupTypeForCategory,
+  type AcceptedMime,
+} from "@/lib/mime";
 import { cn } from "@/lib/utils";
 
-const ACCEPTED_MIMES = [
-  "image/png",
-  "image/jpeg",
-  "image/gif",
-  "image/webp",
-  "image/svg+xml",
-  "application/pdf",
-] as const;
-type AcceptedMime = (typeof ACCEPTED_MIMES)[number];
+const ACCEPTED_MIMES = ACCEPTED_UPLOAD_MIMES;
 
 interface NewMarkupModalProps {
   workspaceId: string;
@@ -230,7 +231,7 @@ function FileTab({
 
   const validate = (f: File): string | null => {
     if (!ACCEPTED_MIMES.includes(f.type as AcceptedMime)) {
-      return "Unsupported file type. Allowed: PNG, JPG, GIF, WEBP, SVG, PDF.";
+      return "Unsupported file. Allowed: images, PDF, Word, Excel, PowerPoint, plain text.";
     }
     if (f.size > MAX_UPLOAD_BYTES) {
       return `File too large (${(f.size / 1024 / 1024).toFixed(1)} MB). Max 50 MB.`;
@@ -301,10 +302,11 @@ function FileTab({
         xhr.send(upload.file);
       });
 
-      // Step 3: register the markup row.
-      const type: "image" | "pdf" = upload.file.type === "application/pdf"
-        ? "pdf"
-        : "image";
+      // Step 3: register the markup row. Office docs and plain text get
+      // bucketed under `pdf` (the canvas dispatcher discriminates by
+      // mime_type at view time).
+      const category = categoryFromFile(upload.file);
+      const type = markupTypeForCategory(category);
       const res = await fetch("/api/markups", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -339,8 +341,22 @@ function FileTab({
     }
   };
 
-  const FileIcon =
-    upload?.file?.type === "application/pdf" ? FileText : ImageIcon;
+  const FileIcon = (() => {
+    if (!upload?.file) return ImageIcon;
+    const mime = upload.file.type;
+    const cat = categoryFromFile(upload.file);
+    if (cat === "image") return ImageIcon;
+    if (cat === "pdf") return FileText;
+    if (cat === "text") return FileType;
+    if (cat === "office") {
+      if (mime.includes("spreadsheet") || mime.includes("excel"))
+        return FileSpreadsheet;
+      if (mime.includes("presentation") || mime.includes("powerpoint"))
+        return Presentation;
+      return FileText;
+    }
+    return FileText;
+  })();
 
   return (
     <div className="flex flex-col gap-5 pb-2">

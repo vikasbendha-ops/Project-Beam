@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { useGuestIdentity } from "@/hooks/use-guest-identity";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useCanvasStore } from "@/stores/canvas-store";
+import { categoryFromMime } from "@/lib/mime";
 import { cn } from "@/lib/utils";
 import type {
   CanvasMarkup,
@@ -36,6 +37,25 @@ const PdfCanvas = dynamic(
     ssr: false,
     loading: () => (
       <div className="text-sm text-muted-foreground">Loading PDF…</div>
+    ),
+  },
+);
+const OfficeCanvas = dynamic(
+  () =>
+    import("@/components/canvas/office-canvas").then((m) => m.OfficeCanvas),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="text-sm text-muted-foreground">Loading document…</div>
+    ),
+  },
+);
+const TextCanvas = dynamic(
+  () => import("@/components/canvas/text-canvas").then((m) => m.TextCanvas),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="text-sm text-muted-foreground">Loading…</div>
     ),
   },
 );
@@ -65,6 +85,7 @@ export function GuestCanvas({
   shareToken,
   canComment,
   markup,
+  version,
   versions,
   threads,
   profiles,
@@ -187,25 +208,47 @@ export function GuestCanvas({
 
         {/* Canvas main */}
         <main className="relative flex flex-1 overflow-hidden">
-          {markup.type === "pdf" ? (
-            <PdfCanvas src={markup.canvasUrl} threads={threads} />
-          ) : (
-            <ImageCanvas
-              src={markup.canvasUrl}
-              alt={markup.title}
-              threads={threads}
-              pinSize={isMobile ? 32 : 28}
-              renderOverlay={() =>
-                canComment ? (
-                  <GuestPinComposer
-                    shareToken={shareToken}
-                    identity={identity}
-                    requestIdentity={() => setPrompt(true)}
-                  />
-                ) : null
-              }
-            />
-          )}
+          {(() => {
+            const docCategory = categoryFromMime(version?.mime_type);
+            if (markup.type === "pdf" && docCategory === "office") {
+              return (
+                <OfficeCanvas
+                  src={markup.canvasUrl}
+                  fileName={version?.file_name}
+                  threads={threads}
+                />
+              );
+            }
+            if (markup.type === "pdf" && docCategory === "text") {
+              return (
+                <TextCanvas
+                  src={markup.canvasUrl}
+                  mime={version?.mime_type}
+                  threads={threads}
+                />
+              );
+            }
+            if (markup.type === "pdf") {
+              return <PdfCanvas src={markup.canvasUrl} threads={threads} />;
+            }
+            return (
+              <ImageCanvas
+                src={markup.canvasUrl}
+                alt={markup.title}
+                threads={threads}
+                pinSize={isMobile ? 32 : 28}
+                renderOverlay={() =>
+                  canComment ? (
+                    <GuestPinComposer
+                      shareToken={shareToken}
+                      identity={identity}
+                      requestIdentity={() => setPrompt(true)}
+                    />
+                  ) : null
+                }
+              />
+            );
+          })()}
           <ZoomControls />
           <div className="pointer-events-none absolute bottom-5 right-5 z-30 flex items-center gap-1.5 rounded-full border border-border bg-card/90 px-3 py-1 text-[11px] font-semibold text-muted-foreground backdrop-blur">
             <Sparkles className="size-3 text-primary" /> Made with Beam
