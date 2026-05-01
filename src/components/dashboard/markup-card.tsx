@@ -9,6 +9,8 @@ import {
   ArchiveRestore,
   Calendar,
   Check,
+  CheckCircle2,
+  Clock,
   FileText,
   FolderInput,
   Globe,
@@ -18,6 +20,7 @@ import {
   MoreHorizontal,
   PencilLine,
   Trash2,
+  XCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -26,9 +29,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { STATUS_LABEL } from "@/lib/constants";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +51,26 @@ import { cn } from "@/lib/utils";
 import type { Database } from "@/types/database";
 
 type MarkupSummary = Database["public"]["Views"]["markup_summary"]["Row"];
+type MarkupStatus = Database["public"]["Enums"]["markup_status"];
+
+const STATUS_ICON: Record<MarkupStatus, typeof Check> = {
+  draft: PencilLine,
+  ready_for_review: Clock,
+  changes_requested: XCircle,
+  approved: CheckCircle2,
+};
+const STATUS_ICON_COLOR: Record<MarkupStatus, string> = {
+  draft: "text-muted-foreground",
+  ready_for_review: "text-sky-600",
+  changes_requested: "text-amber-600",
+  approved: "text-emerald-600",
+};
+const STATUS_ORDER: MarkupStatus[] = [
+  "draft",
+  "ready_for_review",
+  "changes_requested",
+  "approved",
+];
 
 interface MarkupCardProps {
   markup: MarkupSummary;
@@ -128,6 +153,11 @@ export function MarkupCard({ markup, workspaceId }: MarkupCardProps) {
     router.refresh();
   }
 
+  async function handleStatus(status: MarkupStatus) {
+    if (markup.status === status) return;
+    await patch({ status }, `Status: ${STATUS_LABEL[status]}`);
+  }
+
   async function handleMove(folderId: string | null, label: string) {
     setMoving(true);
     const ok = await patch({ folder_id: folderId }, `Moved to ${label}`);
@@ -203,7 +233,28 @@ export function MarkupCard({ markup, workspaceId }: MarkupCardProps) {
           >
             <MoreHorizontal className="size-4" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Status
+            </DropdownMenuLabel>
+            {STATUS_ORDER.map((s) => {
+              const Icon = STATUS_ICON[s];
+              const active = markup.status === s;
+              return (
+                <DropdownMenuItem
+                  key={s}
+                  onSelect={() => handleStatus(s)}
+                  className={cn(active && "bg-muted/50 font-semibold")}
+                >
+                  <Icon className={cn("size-4", STATUS_ICON_COLOR[s])} />
+                  <span className="flex-1">{STATUS_LABEL[s]}</span>
+                  {active ? (
+                    <Check className="size-4 text-muted-foreground" />
+                  ) : null}
+                </DropdownMenuItem>
+              );
+            })}
+            <DropdownMenuSeparator />
             <DropdownMenuItem
               onSelect={() => {
                 setRenameValue(markup.title ?? "");

@@ -42,3 +42,7 @@ next-env.d.ts
 
 # Supabase CLI temp dir at repo root only — must NOT match src/lib/supabase/
 /supabase/
+
+# pdf.js worker — copied from node_modules at build/dev time
+/public/pdf.worker.min.mjs
+/graphify-out/

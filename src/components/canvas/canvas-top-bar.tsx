@@ -2,26 +2,26 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
   History,
-  Loader2,
   MessageSquarePlus,
   MousePointer2,
   PanelLeft,
   Share2,
 } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { ShareModal } from "@/components/canvas/share-modal";
+import { ShortcutsHelp } from "@/components/canvas/shortcuts-help";
+import { StatusMenu } from "@/components/canvas/status-menu";
 import { useCanvasStore } from "@/stores/canvas-store";
 import { cn } from "@/lib/utils";
+import type { MarkupStatus } from "@/components/canvas/types";
 import type {
   CanvasCurrentUser,
   CanvasMarkup,
@@ -49,11 +49,9 @@ export function CanvasTopBar({
   const setMode = useCanvasStore((s) => s.setMode);
   const sidebarCollapsed = useCanvasStore((s) => s.sidebarCollapsed);
   const setSidebarCollapsed = useCanvasStore((s) => s.setSidebarCollapsed);
-  const [approving, setApproving] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const canApprove = currentUser.role !== "guest";
   const canShare = currentUser.role !== "guest";
-  const isApproved = markup.status === "approved";
 
   const { idx, prev, next, total } = useMemo(() => {
     const i = siblings.findIndex((s) => s.id === markup.id);
@@ -65,22 +63,58 @@ export function CanvasTopBar({
     };
   }, [siblings, markup.id]);
 
-  async function toggleApprove() {
-    setApproving(true);
-    const res = await fetch(`/api/markups/${markup.id}/approve`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ approved: !isApproved }),
-    });
-    setApproving(false);
-    if (!res.ok) {
-      const { error } = await res.json().catch(() => ({}));
-      toast.error(error ?? "Approval failed");
-      return;
+  // Wire keyboard shortcuts. Held in a ref so the StatusMenu can populate it
+  // once on mount and the keydown handler always sees the latest closure.
+  const setStatusRef = useRef<((s: MarkupStatus) => Promise<void>) | null>(
+    null,
+  );
+  const prevHrefRef = useRef<string | null>(null);
+  const nextHrefRef = useRef<string | null>(null);
+  useEffect(() => {
+    prevHrefRef.current = prev ? `/w/${workspaceId}/markup/${prev.id}` : null;
+    nextHrefRef.current = next ? `/w/${workspaceId}/markup/${next.id}` : null;
+  }, [prev, next, workspaceId]);
+
+  useEffect(() => {
+    if (!canApprove && !canShare) return;
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      // Don't fire while user is typing in inputs/textareas/contenteditable.
+      if (target) {
+        const tag = target.tagName;
+        if (
+          tag === "INPUT" ||
+          tag === "TEXTAREA" ||
+          target.isContentEditable
+        )
+          return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k === "c") {
+        setMode("comment");
+      } else if (k === "b") {
+        setMode("browse");
+      } else if (canApprove && k === "a") {
+        void setStatusRef.current?.("approved");
+      } else if (canApprove && k === "r") {
+        void setStatusRef.current?.("changes_requested");
+      } else if (canApprove && k === "d") {
+        void setStatusRef.current?.("draft");
+      } else if (canApprove && k === "y") {
+        void setStatusRef.current?.("ready_for_review");
+      } else if (k === "[" || k === "arrowleft") {
+        if (prevHrefRef.current) router.push(prevHrefRef.current);
+      } else if (k === "]" || k === "arrowright") {
+        if (nextHrefRef.current) router.push(nextHrefRef.current);
+      } else {
+        return;
+      }
+      e.preventDefault();
     }
-    toast.success(isApproved ? "Reopened for review" : "Approved");
-    router.refresh();
-  }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [canApprove, canShare, setMode, router]);
 
   const sizeLabel = version?.file_size
     ? formatBytes(version.file_size)
@@ -248,20 +282,13 @@ export function CanvasTopBar({
           </>
         ) : null}
         {canApprove ? (
-          <Button
-            type="button"
-            size="sm"
-            onClick={toggleApprove}
-            disabled={approving}
-            variant={isApproved ? "outline" : "default"}
-          >
-            {approving ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <CheckCircle2 className="size-4" />
-            )}
-            {isApproved ? "Reopen" : "Approve"}
-          </Button>
+          <StatusMenu
+            markupId={markup.id}
+            current={markup.status}
+            onChangeRef={(fn) => {
+              setStatusRef.current = fn;
+            }}
+          />
         ) : null}
       </div>
       <ShareModal
@@ -271,6 +298,7 @@ export function CanvasTopBar({
         markupId={markup.id}
         markupTitle={markup.title}
       />
+      <ShortcutsHelp canApprove={canApprove} />
     </header>
   );
 }
