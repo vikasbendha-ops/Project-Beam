@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
+  Columns2,
   ExternalLink,
   History,
   MessageSquare,
@@ -229,16 +230,35 @@ export function GuestCanvas({
             </span>
           ) : null}
           {hasVariations ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label={rightOpen ? "Hide versions" : "Show versions"}
-              aria-pressed={rightOpen}
-              onClick={() => setRightOpen((v) => !v)}
-            >
-              <History className="size-5" />
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={rightOpen ? "Hide versions" : "Show versions"}
+                aria-pressed={rightOpen}
+                onClick={() => setRightOpen((v) => !v)}
+                title="Quick versions list"
+              >
+                <History className="size-5" />
+              </Button>
+              <Button
+                asChild
+                type="button"
+                variant="ghost"
+                size="sm"
+                title="Open full version history with side-by-side compare"
+              >
+                <Link
+                  href={`/share/${shareToken}/versions${
+                    activeAssetId ? `?asset=${activeAssetId}` : ""
+                  }`}
+                >
+                  <Columns2 className="size-4" />
+                  Compare
+                </Link>
+              </Button>
+            </>
           ) : null}
           <Button asChild variant="outline" size="sm">
             <Link href="/login">Sign in</Link>

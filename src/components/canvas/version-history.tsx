@@ -67,6 +67,15 @@ interface VersionHistoryViewProps {
   }[];
   threadCountsByVersion: Record<string, number>;
   threads: CompareThread[];
+  /** "owner" (default) shows upload + delete affordances. "guest" is
+   *  read-only and uses the share-token back link. */
+  mode?: "owner" | "guest";
+  /** When mode === "guest", this is the share token used for the back
+   *  link target. Ignored otherwise. */
+  shareToken?: string;
+  /** When false (e.g., share link with comments hidden), pin overlays
+   *  are suppressed. Default true. */
+  showComments?: boolean;
 }
 
 const ALLOWED_MIMES = ACCEPTED_UPLOAD_MIMES;
@@ -78,7 +87,11 @@ export function VersionHistoryView({
   profiles,
   threadCountsByVersion,
   threads,
+  mode = "owner",
+  shareToken,
+  showComments = true,
 }: VersionHistoryViewProps) {
+  const isGuest = mode === "guest";
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -232,7 +245,11 @@ export function VersionHistoryView({
             <Menu className="size-5" />
           </Button>
           <Link
-            href={`/w/${workspaceId}/markup/${markup.id}`}
+            href={
+              isGuest
+                ? `/share/${shareToken ?? ""}`
+                : `/w/${workspaceId}/markup/${markup.id}`
+            }
             className="flex items-center gap-3 text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="size-5" />
@@ -259,7 +276,7 @@ export function VersionHistoryView({
               {compareMode ? "Hide compare" : "Compare with current"}
             </Button>
           ) : null}
-          {selected && !selected.is_current ? (
+          {!isGuest && selected && !selected.is_current ? (
             <Button
               type="button"
               variant="outline"
@@ -270,35 +287,39 @@ export function VersionHistoryView({
               Restore this version
             </Button>
           ) : null}
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-          >
-            {uploading ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                Uploading {uploadProgress}%
-              </>
-            ) : (
-              <>
-                <Upload className="size-4" />
-                Upload new version
-              </>
-            )}
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={ALLOWED_MIMES.join(",")}
-            className="sr-only"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void handleUpload(file);
-              e.target.value = "";
-            }}
-          />
+          {!isGuest ? (
+            <>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Uploading {uploadProgress}%
+                  </>
+                ) : (
+                  <>
+                    <Upload className="size-4" />
+                    Upload new version
+                  </>
+                )}
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ALLOWED_MIMES.join(",")}
+                className="sr-only"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleUpload(file);
+                  e.target.value = "";
+                }}
+              />
+            </>
+          ) : null}
         </div>
       </header>
 
@@ -404,7 +425,9 @@ export function VersionHistoryView({
             <>
               <PreviewHeader
                 selected={selected}
-                onDelete={() => deleteVersion(selected.id)}
+                onDelete={
+                  isGuest ? undefined : () => deleteVersion(selected.id)
+                }
               />
               {compareMode && canCompare && current ? (
                 <div className="grid flex-1 grid-cols-1 overflow-hidden md:grid-cols-2">
@@ -432,20 +455,22 @@ export function VersionHistoryView({
                     mime={selected.mime_type}
                     fileName={selected.file_name}
                   />
-                  {/* Read-only pin overlay for THIS version only. */}
-                  <ComparePinOverlay
-                    threads={threads.filter(
-                      (t) => t.markup_version_id === selected.id,
-                    )}
-                    activeVersionId={selected.id}
-                    versionNumberById={versions.reduce<Record<string, number>>(
-                      (acc, v) => {
+                  {/* Read-only pin overlay for THIS version only. Hidden
+                      when the share link has comments hidden. */}
+                  {showComments ? (
+                    <ComparePinOverlay
+                      threads={threads.filter(
+                        (t) => t.markup_version_id === selected.id,
+                      )}
+                      activeVersionId={selected.id}
+                      versionNumberById={versions.reduce<
+                        Record<string, number>
+                      >((acc, v) => {
                         acc[v.id] = v.version_number;
                         return acc;
-                      },
-                      {},
-                    )}
-                  />
+                      }, {})}
+                    />
+                  ) : null}
                 </div>
               )}
             </>
@@ -469,7 +494,7 @@ function PreviewHeader({
   onDelete,
 }: {
   selected: Version;
-  onDelete: () => void;
+  onDelete?: () => void;
 }) {
   return (
     <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border bg-card px-6 py-4">
@@ -493,7 +518,7 @@ function PreviewHeader({
             : "—"}
         </p>
       </div>
-      {!selected.is_current ? (
+      {onDelete && !selected.is_current ? (
         <Button
           type="button"
           variant="ghost"
