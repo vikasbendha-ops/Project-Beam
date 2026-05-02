@@ -82,9 +82,13 @@ export default async function SharePage({
        )`,
     )
     .order("thread_number", { ascending: true });
-  const { data: threads } = await (activeAsset
+  const { data: rawThreads } = await (activeAsset
     ? baseThreadQuery.eq("asset_id", activeAsset.id)
     : baseThreadQuery.eq("markup_id", markup.id));
+  // When the share link has comments hidden, do NOT pass any thread data
+  // to the guest. Empty list means: no pin overlay, no count badge, no
+  // sidebar entries.
+  const threads = share.can_view_comments ? rawThreads : [];
 
   const authorIds = Array.from(
     new Set([
@@ -130,6 +134,7 @@ export default async function SharePage({
     <GuestCanvas
       shareToken={token}
       canComment={share.can_comment}
+      canViewComments={share.can_view_comments}
       markup={{
         id: markup.id,
         title: markup.title,

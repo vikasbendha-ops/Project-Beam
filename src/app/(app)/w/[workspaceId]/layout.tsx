@@ -31,7 +31,7 @@ export default async function WorkspaceLayout({
   // but we want a clean 404 vs an empty layout).
   const { data: workspace } = await supabase
     .from("workspaces")
-    .select("id, name, is_personal")
+    .select("id, name, is_personal, avatar_url")
     .eq("id", workspaceId)
     .maybeSingle();
 
@@ -41,7 +41,7 @@ export default async function WorkspaceLayout({
   const { data: memberships } = await supabase
     .from("workspace_members")
     .select(
-      "workspaces!inner(id, name, is_personal, owner_id)",
+      "workspaces!inner(id, name, is_personal, owner_id, avatar_url)",
     )
     .eq("user_id", user.id);
 
@@ -54,6 +54,7 @@ export default async function WorkspaceLayout({
           id: w.id,
           name: w.name,
           is_personal: w.is_personal,
+          avatar_url: w.avatar_url,
           initials: w.name
             .split(" ")
             .map((p) => p[0])
@@ -68,6 +69,7 @@ export default async function WorkspaceLayout({
     id: workspace.id,
     name: workspace.name,
     is_personal: workspace.is_personal,
+    avatar_url: workspace.avatar_url,
     initials: workspace.name
       .split(" ")
       .map((p) => p[0])

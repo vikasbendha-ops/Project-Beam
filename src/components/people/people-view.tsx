@@ -88,18 +88,32 @@ export function PeopleView({
   }
 
   async function sendInvites() {
-    if (draft.trim()) commitDraft();
-    if (emails.length === 0) {
+    // Roll any pending draft into the email list synchronously — relying on
+    // commitDraft() alone wouldn't work because setEmails is async, leaving
+    // the local `emails` array stale at submit time.
+    let outgoing = [...emails];
+    const v = draft.trim().toLowerCase();
+    if (v) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
+        toast.error("Enter a valid email");
+        return;
+      }
+      if (!outgoing.includes(v)) outgoing.push(v);
+    }
+    outgoing = Array.from(new Set(outgoing));
+    if (outgoing.length === 0) {
       toast.error("Add at least one email");
       return;
     }
+    setEmails(outgoing);
+    setDraft("");
     setSubmitting(true);
     const res = await fetch("/api/invites", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         workspace_id: workspace.id,
-        emails,
+        emails: outgoing,
         role,
         message: message.trim() || undefined,
       }),

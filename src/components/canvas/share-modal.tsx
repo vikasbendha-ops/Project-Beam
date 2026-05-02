@@ -30,6 +30,7 @@ interface ShareLink {
   id: string;
   token: string;
   can_comment: boolean;
+  can_view_comments: boolean;
   is_active: boolean;
   expires_at: string | null;
 }
@@ -108,18 +109,30 @@ function InvitePanel({
   }
 
   async function handleSend() {
-    if (draft.trim()) commitDraft();
-    if (emails.length === 0) {
+    // Roll pending draft into a synchronous list so we don't race setEmails.
+    let outgoing = [...emails];
+    const v = draft.trim().toLowerCase();
+    if (v) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
+        toast.error("Enter a valid email");
+        return;
+      }
+      if (!outgoing.includes(v)) outgoing.push(v);
+    }
+    outgoing = Array.from(new Set(outgoing));
+    if (outgoing.length === 0) {
       toast.error("Add at least one email");
       return;
     }
+    setEmails(outgoing);
+    setDraft("");
     setSubmitting(true);
     const res = await fetch("/api/invites", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         workspace_id: workspaceId,
-        emails,
+        emails: outgoing,
         role,
         message: message.trim() || undefined,
         markup_id: role === "guest" ? markupId : undefined,
@@ -258,14 +271,48 @@ function LinkPanel({ markupId }: { markupId: string }) {
   async function toggleCanComment(value: boolean) {
     if (!link) return;
     const prev = link.can_comment;
-    setLink({ ...link, can_comment: value });
+    // Posting requires viewing — if a user enables can_comment, also force
+    // can_view_comments back on so the UI is coherent.
+    const next = {
+      ...link,
+      can_comment: value,
+      can_view_comments: value ? true : link.can_view_comments,
+    };
+    setLink(next);
     const res = await fetch(`/api/share-links/${link.id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ can_comment: value }),
+      body: JSON.stringify({
+        can_comment: value,
+        ...(value ? { can_view_comments: true } : {}),
+      }),
     });
     if (!res.ok) {
       setLink({ ...link, can_comment: prev });
+      toast.error("Couldn't update");
+    }
+  }
+
+  async function toggleCanViewComments(value: boolean) {
+    if (!link) return;
+    const prev = link.can_view_comments;
+    // Hiding view → also disable comment (can't post if you can't see).
+    const next = {
+      ...link,
+      can_view_comments: value,
+      can_comment: value ? link.can_comment : false,
+    };
+    setLink(next);
+    const res = await fetch(`/api/share-links/${link.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        can_view_comments: value,
+        ...(value ? {} : { can_comment: false }),
+      }),
+    });
+    if (!res.ok) {
+      setLink({ ...link, can_view_comments: prev });
       toast.error("Couldn't update");
     }
   }
@@ -316,15 +363,30 @@ function LinkPanel({ markupId }: { markupId: string }) {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-semibold text-foreground">
-            Anyone with the link can comment
+            Guests can see comments
           </p>
           <p className="text-[11px] text-muted-foreground">
-            Toggle off to make the link view-only.
+            When off, the link is view-only and shows no pins or counts.
+          </p>
+        </div>
+        <Switch
+          checked={link.can_view_comments}
+          onCheckedChange={toggleCanViewComments}
+        />
+      </div>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-foreground">
+            Guests can post comments
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            Requires &ldquo;can see comments&rdquo; on. Toggle off for review-only.
           </p>
         </div>
         <Switch
           checked={link.can_comment}
           onCheckedChange={toggleCanComment}
+          disabled={!link.can_view_comments}
         />
       </div>
       <div className="flex gap-2">

@@ -7,6 +7,9 @@ interface ResolvedShare {
   token: string;
   markup_id: string;
   can_comment: boolean;
+  /** When false, hide every existing comment from the guest (no list,
+   *  no pin overlay, no count badge). */
+  can_view_comments: boolean;
   expired: boolean;
   is_active: boolean;
 }
@@ -24,7 +27,9 @@ export async function resolveShareToken(
 ): Promise<ResolvedShare | null> {
   const { data } = await supabase
     .from("share_links")
-    .select("id, token, markup_id, can_comment, expires_at, is_active")
+    .select(
+      "id, token, markup_id, can_comment, can_view_comments, expires_at, is_active",
+    )
     .eq("token", token)
     .maybeSingle();
 
@@ -40,6 +45,7 @@ export async function resolveShareToken(
     token: data.token,
     markup_id: data.markup_id,
     can_comment: data.can_comment,
+    can_view_comments: data.can_view_comments ?? true,
     expired,
     is_active: data.is_active,
   };

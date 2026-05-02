@@ -27,12 +27,15 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
   const updates: {
     is_active?: boolean;
     can_comment?: boolean;
+    can_view_comments?: boolean;
     expires_at?: string | null;
   } = {};
   if (parsed.data.is_active !== undefined)
     updates.is_active = parsed.data.is_active;
   if (parsed.data.can_comment !== undefined)
     updates.can_comment = parsed.data.can_comment;
+  if (parsed.data.can_view_comments !== undefined)
+    updates.can_view_comments = parsed.data.can_view_comments;
   if (parsed.data.expires_at !== undefined)
     updates.expires_at = parsed.data.expires_at;
   if (Object.keys(updates).length === 0)

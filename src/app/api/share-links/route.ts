@@ -65,10 +65,13 @@ export async function POST(request: NextRequest) {
       folder_id: parsed.data.folder_id ?? null,
       workspace_id: parsed.data.workspace_id ?? null,
       can_comment: parsed.data.can_comment ?? true,
+      can_view_comments: parsed.data.can_view_comments ?? true,
       expires_at: parsed.data.expires_at ?? null,
       created_by: user.id,
     })
-    .select("id, token, can_comment, expires_at, is_active, created_at")
+    .select(
+      "id, token, can_comment, can_view_comments, expires_at, is_active, created_at",
+    )
     .single();
 
   if (error || !data) {

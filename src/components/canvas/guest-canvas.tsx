@@ -85,6 +85,9 @@ interface GuestAsset {
 interface GuestCanvasProps {
   shareToken: string;
   canComment: boolean;
+  /** When false: no comment count badge, no comment list drawer toggle,
+   *  no pin overlay. Composer is also hidden. */
+  canViewComments?: boolean;
   markup: CanvasMarkup;
   version: CanvasVersion | null;
   versions: GuestVersionRow[];
@@ -97,6 +100,7 @@ interface GuestCanvasProps {
 export function GuestCanvas({
   shareToken,
   canComment,
+  canViewComments = true,
   markup,
   version,
   versions,
@@ -177,22 +181,24 @@ export function GuestCanvas({
       {/* Top bar */}
       <header className="z-30 flex h-16 shrink-0 items-center justify-between border-b border-border bg-card px-3 md:px-4">
         <div className="flex min-w-0 items-center gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label={leftOpen ? "Hide comments" : "Show comments"}
-            aria-pressed={leftOpen}
-            onClick={() => setLeftOpen((v) => !v)}
-            className="relative"
-          >
-            <MessageSquare className="size-5" />
-            {threads.length > 0 ? (
-              <span className="absolute -right-0.5 -top-0.5 flex min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
-                {threads.length > 99 ? "99+" : threads.length}
-              </span>
-            ) : null}
-          </Button>
+          {canViewComments ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={leftOpen ? "Hide comments" : "Show comments"}
+              aria-pressed={leftOpen}
+              onClick={() => setLeftOpen((v) => !v)}
+              className="relative"
+            >
+              <MessageSquare className="size-5" />
+              {threads.length > 0 ? (
+                <span className="absolute -right-0.5 -top-0.5 flex min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                  {threads.length > 99 ? "99+" : threads.length}
+                </span>
+              ) : null}
+            </Button>
+          ) : null}
           <BeamWordmark className="text-lg" />
           <span className="hidden h-5 w-px bg-border sm:inline-block" />
           <div className="hidden min-w-0 sm:block">

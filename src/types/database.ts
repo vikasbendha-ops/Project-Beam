@@ -278,6 +278,7 @@ export type Database = {
           created_at: string
           created_by: string
           deleted_at: string | null
+          favorite: boolean
           folder_id: string | null
           id: string
           project_id: string
@@ -296,6 +297,7 @@ export type Database = {
           created_at?: string
           created_by: string
           deleted_at?: string | null
+          favorite?: boolean
           folder_id?: string | null
           id?: string
           project_id: string
@@ -314,6 +316,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           deleted_at?: string | null
+          favorite?: boolean
           folder_id?: string | null
           id?: string
           project_id?: string
@@ -668,6 +671,7 @@ export type Database = {
       share_links: {
         Row: {
           can_comment: boolean
+          can_view_comments: boolean
           created_at: string
           created_by: string
           expires_at: string | null
@@ -680,6 +684,7 @@ export type Database = {
         }
         Insert: {
           can_comment?: boolean
+          can_view_comments?: boolean
           created_at?: string
           created_by: string
           expires_at?: string | null
@@ -692,6 +697,7 @@ export type Database = {
         }
         Update: {
           can_comment?: boolean
+          can_view_comments?: boolean
           created_at?: string
           created_by?: string
           expires_at?: string | null
@@ -1034,6 +1040,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           deleted_at: string | null
+          favorite: boolean | null
           folder_id: string | null
           id: string | null
           latest_version: number | null
@@ -1056,6 +1063,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           deleted_at?: string | null
+          favorite?: boolean | null
           folder_id?: string | null
           id?: string | null
           latest_version?: never
@@ -1078,6 +1086,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           deleted_at?: string | null
+          favorite?: boolean | null
           folder_id?: string | null
           id?: string | null
           latest_version?: never

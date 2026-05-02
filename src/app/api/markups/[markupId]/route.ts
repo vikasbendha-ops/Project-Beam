@@ -15,7 +15,9 @@ const STATUS_VALUES = [
 const patchSchema = z.object({
   title: z.string().trim().min(1).max(120).optional(),
   folder_id: z.string().uuid().nullable().optional(),
+  project_id: z.string().uuid().optional(),
   archived: z.boolean().optional(),
+  favorite: z.boolean().optional(),
   status: z.enum(STATUS_VALUES).optional(),
 });
 
@@ -44,7 +46,9 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
   const updates: {
     title?: string;
     folder_id?: string | null;
+    project_id?: string;
     archived?: boolean;
+    favorite?: boolean;
     status?: (typeof STATUS_VALUES)[number];
     approved_at?: string | null;
     approved_by?: string | null;
@@ -52,8 +56,12 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
   if (parsed.data.title !== undefined) updates.title = parsed.data.title;
   if (parsed.data.folder_id !== undefined)
     updates.folder_id = parsed.data.folder_id;
+  if (parsed.data.project_id !== undefined)
+    updates.project_id = parsed.data.project_id;
   if (parsed.data.archived !== undefined)
     updates.archived = parsed.data.archived;
+  if (parsed.data.favorite !== undefined)
+    updates.favorite = parsed.data.favorite;
 
   // Status changes are gated to members + owners (no guests).
   // We also need the previous status so we can skip dispatching when it's a no-op.

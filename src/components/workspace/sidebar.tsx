@@ -59,9 +59,9 @@ export function Sidebar({
     label: string;
     icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
   }[] = [
-    { href: `${base}?filter=shared`, label: "Shared with me", icon: Users },
     { href: `${base}?filter=favorites`, label: "Favorites", icon: Star },
     { href: `${base}?filter=archive`, label: "Archive", icon: Archive },
+    { href: `${base}/people`, label: "People", icon: Users },
   ];
 
   async function moveToRoot(markupId: string) {
@@ -222,7 +222,10 @@ function ProjectRow({
   project: ProjectSummary;
   folders: FolderNode[];
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const pathname = usePathname();
   const projectHref = `/w/${workspaceId}?project=${project.id}`;
   const search = pathname.includes(`/w/${workspaceId}`);
@@ -230,6 +233,49 @@ function ProjectRow({
     search &&
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("project") === project.id;
+
+  // Drop a markup card onto a project header → set project_id + clear
+  // folder_id (loose markup, lives at project root).
+  async function handleDropMarkup(markupId: string) {
+    const res = await fetch(`/api/markups/${markupId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        project_id: project.id,
+        folder_id: null,
+      }),
+    });
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({}));
+      toast.error(error ?? "Couldn't move");
+      return;
+    }
+    toast.success(`Moved to ${project.name}`);
+    router.refresh();
+  }
+
+  async function newFolder() {
+    const name = window.prompt(`New folder in "${project.name}"`);
+    if (!name?.trim()) return;
+    setCreating(true);
+    const { createFolderInProject } = await import(
+      "@/components/workspace/folder-tree"
+    );
+    const result = await createFolderInProject({
+      workspaceId,
+      projectId: project.id,
+      parentId: null,
+      name: name.trim(),
+    });
+    setCreating(false);
+    if (!result.ok) {
+      toast.error(result.error ?? "Couldn't create folder");
+      return;
+    }
+    toast.success("Folder created");
+    setOpen(true);
+    router.refresh();
+  }
 
   return (
     <div className="flex flex-col">
@@ -239,7 +285,22 @@ function ProjectRow({
           isActive
             ? "bg-card text-primary"
             : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
+          dragOver && "bg-accent ring-2 ring-primary",
         )}
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes(MARKUP_DRAG_TYPE)) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          if (!dragOver) setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          if (!e.dataTransfer.types.includes(MARKUP_DRAG_TYPE)) return;
+          e.preventDefault();
+          setDragOver(false);
+          const id = e.dataTransfer.getData(MARKUP_DRAG_TYPE);
+          if (id) void handleDropMarkup(id);
+        }}
       >
         <button
           type="button"
@@ -264,10 +325,28 @@ function ProjectRow({
           />
           <span className="truncate">{project.name}</span>
         </Link>
+        <button
+          type="button"
+          aria-label={`New folder in ${project.name}`}
+          onClick={newFolder}
+          disabled={creating}
+          className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100 disabled:opacity-100"
+        >
+          {creating ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <Plus className="size-3.5" strokeWidth={2} />
+          )}
+        </button>
       </div>
       {open ? (
         <div className="ml-2 border-l border-border/50 pl-1">
-          <FolderTree workspaceId={workspaceId} folders={folders} />
+          <FolderTree
+            workspaceId={workspaceId}
+            folders={folders}
+            projectId={project.id}
+            hideHeader
+          />
         </div>
       ) : null}
     </div>

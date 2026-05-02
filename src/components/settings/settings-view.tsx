@@ -150,6 +150,8 @@ function ProfileTab({
   const router = useRouter();
   const [name, setName] = useState(profile.name);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
   const initials = (name || profile.email || "?")
     .split(" ")
     .map((p) => p[0])
@@ -175,6 +177,43 @@ function ProfileTab({
     router.refresh();
   }
 
+  async function uploadAvatar(file: File) {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Pick an image file (PNG/JPG/WebP).");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Image too large (max 2 MB).");
+      return;
+    }
+    setUploading(true);
+    const res = await fetch("/api/profile/avatar", {
+      method: "POST",
+      headers: { "content-type": file.type },
+      body: file,
+    });
+    setUploading(false);
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({}));
+      toast.error(error ?? "Avatar upload failed");
+      return;
+    }
+    toast.success("Avatar updated");
+    router.refresh();
+  }
+
+  async function clearAvatar() {
+    setUploading(true);
+    const res = await fetch("/api/profile/avatar", { method: "DELETE" });
+    setUploading(false);
+    if (!res.ok) {
+      toast.error("Couldn't remove avatar");
+      return;
+    }
+    toast.success("Avatar removed");
+    router.refresh();
+  }
+
   return (
     <Card title="Your profile" description="Visible to everyone you collaborate with.">
       <div className="flex items-center gap-4">
@@ -186,11 +225,51 @@ function ProfileTab({
             {initials}
           </AvatarFallback>
         </Avatar>
-        <div>
+        <div className="flex flex-col gap-1.5">
           <p className="text-sm font-semibold text-foreground">{profile.email}</p>
-          <p className="text-xs text-muted-foreground">
-            Email changes require contacting support.
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <ImagePlus className="size-4" />
+              )}
+              {profile.avatar_url ? "Change avatar" : "Upload avatar"}
+            </Button>
+            {profile.avatar_url ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={clearAvatar}
+                disabled={uploading}
+                className="text-muted-foreground hover:text-destructive"
+              >
+                <X className="size-4" />
+                Remove
+              </Button>
+            ) : null}
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            PNG, JPG, or WebP · up to 2 MB · square works best.
           </p>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="sr-only"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void uploadAvatar(f);
+              e.target.value = "";
+            }}
+          />
         </div>
       </div>
       <div className="grid gap-2">
@@ -388,6 +467,26 @@ function WorkspaceTab({
           </Button>
         </div>
       ) : null}
+
+      {/* Members shortcut */}
+      <div className="-mx-6 -mb-6 border-t border-border bg-muted/30 px-6 py-4">
+        <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              Team members
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              Invite teammates by email and manage their roles.
+            </p>
+          </div>
+          <Button asChild type="button" size="sm">
+            <Link href={`/w/${workspace.id}/people`}>
+              <User className="size-4" />
+              Manage members
+            </Link>
+          </Button>
+        </div>
+      </div>
     </Card>
   );
 }

@@ -14,6 +14,7 @@ import {
   FileText,
   FolderInput,
   Globe,
+  Heart,
   Image as ImageIcon,
   Loader2,
   MessageSquare,
@@ -259,6 +260,14 @@ export function MarkupCard({
               <div className="absolute left-2 top-2">
                 <StatusPill status={markup.status} size="sm" />
               </div>
+            ) : null}
+            {markup.id ? (
+              <FavoriteButton
+                markupId={markup.id}
+                initial={Boolean(
+                  (markup as MarkupSummary & { favorite?: boolean }).favorite,
+                )}
+              />
             ) : null}
           </div>
           <div className="flex flex-col gap-1.5 p-4">
@@ -520,5 +529,66 @@ function FolderRow({
         ) : null}
       </button>
     </li>
+  );
+}
+
+/**
+ * Heart toggle on every card thumbnail. Optimistic state, soft refresh
+ * on persist so "Favorites" filter view stays in sync.
+ */
+function FavoriteButton({
+  markupId,
+  initial,
+}: {
+  markupId: string;
+  initial: boolean;
+}) {
+  const router = useRouter();
+  const [fav, setFav] = useState(initial);
+  const [busy, setBusy] = useState(false);
+
+  async function toggle(e: React.MouseEvent | React.PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (busy) return;
+    const next = !fav;
+    setFav(next);
+    setBusy(true);
+    const res = await fetch(`/api/markups/${markupId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ favorite: next }),
+    });
+    setBusy(false);
+    if (!res.ok) {
+      setFav(!next);
+      const { error } = await res.json().catch(() => ({}));
+      toast.error(error ?? "Couldn't update");
+      return;
+    }
+    router.refresh();
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      onPointerDown={(e) => e.stopPropagation()}
+      aria-pressed={fav}
+      aria-label={fav ? "Remove from favorites" : "Mark as favorite"}
+      title={fav ? "Remove from favorites" : "Mark as favorite"}
+      className={cn(
+        "absolute right-2 top-2 z-10 flex size-7 items-center justify-center rounded-full bg-card/95 shadow-sm backdrop-blur transition-all",
+        fav
+          ? "text-rose-500 hover:bg-rose-50"
+          : "text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100",
+      )}
+    >
+      <Heart
+        className={cn("size-4 transition-transform", fav && "scale-110")}
+        strokeWidth={fav ? 2 : 1.75}
+        fill={fav ? "currentColor" : "none"}
+      />
+    </button>
   );
 }

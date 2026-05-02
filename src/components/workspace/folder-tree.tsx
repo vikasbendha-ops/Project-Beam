@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronDown,
   ChevronRight,
@@ -25,6 +25,13 @@ export interface FolderNode {
 interface FolderTreeProps {
   workspaceId: string;
   folders: FolderNode[];
+  /** When set, top-level folders created from this tree land in this
+   *  project (sidebar passes the surrounding project). Without it, the
+   *  API resolves to the workspace default. */
+  projectId?: string | null;
+  /** Hide the section header — used when a project row already provides
+   *  its own header + create button. */
+  hideHeader?: boolean;
 }
 
 /**
@@ -33,8 +40,18 @@ interface FolderTreeProps {
  */
 export const MARKUP_DRAG_TYPE = "application/x-beam-markup";
 
-export function FolderTree({ workspaceId, folders }: FolderTreeProps) {
+export function FolderTree({
+  workspaceId,
+  folders,
+  projectId: propProjectId,
+  hideHeader = false,
+}: FolderTreeProps) {
   const router = useRouter();
+  const search = useSearchParams();
+  // Prefer the prop (sidebar passes the project that owns this tree).
+  // Fall back to the URL param so /w/[id]?project=X still works for the
+  // cross-project tree (legacy callers that pass no prop).
+  const projectId = propProjectId ?? search.get("project") ?? null;
   const [creatingTopLevel, setCreatingTopLevel] = useState(false);
 
   async function createFolder(parentId: string | null) {
@@ -45,6 +62,7 @@ export function FolderTree({ workspaceId, folders }: FolderTreeProps) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         workspace_id: workspaceId,
+        project_id: projectId ?? undefined,
         name: name.trim(),
         parent_folder_id: parentId,
       }),
@@ -60,37 +78,39 @@ export function FolderTree({ workspaceId, folders }: FolderTreeProps) {
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between px-3 py-1.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Folders
-        </span>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="New folder"
-          className="size-6"
-          onClick={async () => {
-            setCreatingTopLevel(true);
-            try {
-              await createFolder(null);
-            } finally {
-              setCreatingTopLevel(false);
-            }
-          }}
-          disabled={creatingTopLevel}
-        >
-          {creatingTopLevel ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : (
-            <FolderPlus className="size-3.5" strokeWidth={1.5} />
-          )}
-        </Button>
-      </div>
+      {!hideHeader ? (
+        <div className="flex items-center justify-between px-3 py-1.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Folders
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="New folder"
+            className="size-6"
+            onClick={async () => {
+              setCreatingTopLevel(true);
+              try {
+                await createFolder(null);
+              } finally {
+                setCreatingTopLevel(false);
+              }
+            }}
+            disabled={creatingTopLevel}
+          >
+            {creatingTopLevel ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <FolderPlus className="size-3.5" strokeWidth={1.5} />
+            )}
+          </Button>
+        </div>
+      ) : null}
       <div className="flex flex-col">
         {folders.length === 0 ? (
-          <p className="px-3 py-1.5 text-xs text-muted-foreground/70">
-            No folders yet.
+          <p className="px-3 py-1.5 text-[11px] text-muted-foreground/70">
+            No folders.
           </p>
         ) : (
           folders.map((f) => (
@@ -106,6 +126,31 @@ export function FolderTree({ workspaceId, folders }: FolderTreeProps) {
       </div>
     </div>
   );
+}
+
+// Exposed so ProjectRow in sidebar.tsx can call create-folder using the
+// same handler logic without duplicating the prompt + fetch.
+export async function createFolderInProject(args: {
+  workspaceId: string;
+  projectId: string;
+  parentId: string | null;
+  name: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch("/api/folders", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      workspace_id: args.workspaceId,
+      project_id: args.projectId,
+      name: args.name,
+      parent_folder_id: args.parentId,
+    }),
+  });
+  if (!res.ok) {
+    const { error } = await res.json().catch(() => ({}));
+    return { ok: false, error: error ?? "Couldn't create folder" };
+  }
+  return { ok: true };
 }
 
 function FolderRow({

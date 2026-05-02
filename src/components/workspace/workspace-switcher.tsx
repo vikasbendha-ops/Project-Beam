@@ -19,6 +19,7 @@ export interface WorkspaceSummary {
   name: string;
   is_personal: boolean;
   initials?: string;
+  avatar_url?: string | null;
 }
 
 interface WorkspaceSwitcherProps {
@@ -38,8 +39,19 @@ export function WorkspaceSwitcher({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger className="flex w-full items-center gap-2.5 rounded-xl border border-transparent px-2.5 py-2 text-left transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-            {current.initials ?? current.name.slice(0, 2).toUpperCase()}
+          <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary text-sm font-bold text-primary-foreground">
+            {current.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={current.avatar_url}
+                alt={current.name}
+                className="size-full object-cover"
+              />
+            ) : (
+              <span>
+                {current.initials ?? current.name.slice(0, 2).toUpperCase()}
+              </span>
+            )}
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-foreground">
@@ -119,8 +131,19 @@ function WorkspaceItem({
           isCurrent && "bg-accent",
         )}
       >
-        <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-[11px] font-bold text-muted-foreground">
-          {workspace.initials ?? workspace.name.slice(0, 2).toUpperCase()}
+        <div className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted text-[11px] font-bold text-muted-foreground">
+          {workspace.avatar_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={workspace.avatar_url}
+              alt={workspace.name}
+              className="size-full object-cover"
+            />
+          ) : (
+            <span>
+              {workspace.initials ?? workspace.name.slice(0, 2).toUpperCase()}
+            </span>
+          )}
         </div>
         <span className="flex-1 truncate text-sm">{workspace.name}</span>
         {isCurrent ? <Check className="size-4 text-primary" /> : null}

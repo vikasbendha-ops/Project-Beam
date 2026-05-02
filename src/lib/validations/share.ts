@@ -6,6 +6,7 @@ export const createShareLinkSchema = z
     folder_id: z.string().uuid().nullable().optional(),
     workspace_id: z.string().uuid().nullable().optional(),
     can_comment: z.boolean().optional(),
+    can_view_comments: z.boolean().optional(),
     expires_at: z.string().datetime().nullable().optional(),
   })
   .refine(
@@ -18,6 +19,7 @@ export const patchShareLinkSchema = z
   .object({
     is_active: z.boolean().optional(),
     can_comment: z.boolean().optional(),
+    can_view_comments: z.boolean().optional(),
     expires_at: z.string().datetime().nullable().optional(),
   })
   .strict();
