@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowDownUp, Check, Search, X } from "lucide-react";
+import { ArrowDownUp, Check, Loader2, Search, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,7 +57,8 @@ interface DashboardFiltersProps {
 export function DashboardFilters({ counts }: DashboardFiltersProps) {
   const router = useRouter();
   const params = useSearchParams();
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   const currentStatus = (params.get("status") ?? "all") as
     | MarkupStatus
     | "all";
@@ -82,7 +83,13 @@ export function DashboardFilters({ counts }: DashboardFiltersProps) {
     return () => clearTimeout(t);
   }, [q, params, router]);
 
+  // Reset pendingKey once the React transition lands.
+  useEffect(() => {
+    if (!isPending) setPendingKey(null);
+  }, [isPending]);
+
   function setStatus(s: MarkupStatus | "all") {
+    setPendingKey(`status:${s}`);
     const next = new URLSearchParams(params.toString());
     if (s === "all") next.delete("status");
     else next.set("status", s);
@@ -92,6 +99,7 @@ export function DashboardFilters({ counts }: DashboardFiltersProps) {
   }
 
   function setSort(s: SortKey) {
+    setPendingKey(`sort:${s}`);
     const next = new URLSearchParams(params.toString());
     if (s === "updated") next.delete("sort");
     else next.set("sort", s);
@@ -106,24 +114,36 @@ export function DashboardFilters({ counts }: DashboardFiltersProps) {
         {FILTER_OPTIONS.map((opt) => {
           const active = opt.key === currentStatus;
           const count = counts?.[opt.key];
+          const loading = pendingKey === `status:${opt.key}`;
           return (
             <button
               key={opt.key}
               type="button"
               onClick={() => setStatus(opt.key)}
+              aria-pressed={active}
+              disabled={isPending}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                "inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-wait",
                 active
                   ? "border-foreground bg-foreground text-background"
                   : "border-border bg-card text-muted-foreground hover:text-foreground",
               )}
             >
-              <span
-                className={cn(
-                  "size-1.5 rounded-full",
-                  active ? "bg-background/80" : opt.dot,
-                )}
-              />
+              {loading ? (
+                <Loader2
+                  className={cn(
+                    "size-3 animate-spin",
+                    active ? "text-background/80" : "text-muted-foreground",
+                  )}
+                />
+              ) : (
+                <span
+                  className={cn(
+                    "size-1.5 rounded-full",
+                    active ? "bg-background/80" : opt.dot,
+                  )}
+                />
+              )}
               {opt.label}
               {typeof count === "number" ? (
                 <span

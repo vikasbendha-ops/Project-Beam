@@ -174,8 +174,16 @@ export default async function MarkupCanvasPage({
     signPromise,
   ]);
 
+  // Fallback chain: signed version URL → active asset's thumbnail →
+  // markup-level thumbnail. The middle step matters for multi-asset
+  // markups: when sign fails for any reason (RLS, missing path) the
+  // active asset's thumbnail is the right substitute, NOT the markup's
+  // primary-asset thumbnail (which would show the wrong image).
   const canvasUrl =
-    signed?.signedUrl ?? markup.thumbnail_url ?? null;
+    signed?.signedUrl ??
+    activeAsset?.thumbnail_url ??
+    markup.thumbnail_url ??
+    null;
 
   // Sibling preloads are fire-and-forget; they don't block render.
   // We resolve them via thumbnail_url which is already a long-lived signed
@@ -198,7 +206,12 @@ export default async function MarkupCanvasPage({
           fetchPriority="low"
         />
       ))}
+      {/* key={activeAssetId} forces a full remount on asset switch so
+         transient client state (zoom, pan, scroll, image-load size) doesn't
+         leak across assets. Cheap because canvas-state still receives the
+         same currentUser/workspaceId. */}
       <CanvasViewer
+        key={activeAsset?.id ?? "no-asset"}
         markup={{
           id: markup.id,
           title: markup.title,

@@ -66,17 +66,13 @@ export default async function WorkspaceDashboard({
       : "updated";
 
   // Project filter: ?project=<id> narrows to one project; otherwise show
-  // all markups across the workspace (the "All MarkUps" view).
+  // EVERY markup workspace-wide (Dashboard view = no folder/project gate).
   const projectFilter = sp.project ?? null;
-  // When a project is selected, show only top-level markups inside it
-  // (folders break the list out into sub-pages). Without a project filter,
-  // show all top-level markups workspace-wide.
   let query = supabase
     .from("markup_summary")
     .select("*")
     .eq("workspace_id", workspace.id)
-    .is("folder_id", null)
-    .limit(60);
+    .limit(120);
   if (projectFilter) query = query.eq("project_id", projectFilter);
   if (sortKey === "comments") {
     query = query
@@ -107,13 +103,15 @@ export default async function WorkspaceDashboard({
   }
   const { data: markups } = await query;
 
-  // Count by status across the whole root (ignores filters) so the pills
-  // show useful totals regardless of what the user has selected.
-  const { data: countRows } = await supabase
+  // Status counts mirror the same scope as the list (workspace-wide, with
+  // optional project narrowing). Ignore the user's status pill so totals
+  // stay stable as they switch filters.
+  let countQ = supabase
     .from("markup_summary")
     .select("status")
-    .eq("workspace_id", workspace.id)
-    .is("folder_id", null);
+    .eq("workspace_id", workspace.id);
+  if (projectFilter) countQ = countQ.eq("project_id", projectFilter);
+  const { data: countRows } = await countQ;
   const counts: Partial<Record<MarkupStatus | "all", number>> = {
     all: countRows?.length ?? 0,
   };
@@ -134,11 +132,11 @@ export default async function WorkspaceDashboard({
             <span>{workspace.name}</span>
             <ChevronRight className="size-3.5" />
             <span className="text-foreground">
-              {projectFilter ? "Project" : "All MarkUps"}
+              {projectFilter ? "Project" : "Dashboard"}
             </span>
           </nav>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            {projectFilter ? "MarkUps" : "All MarkUps"}
+            {projectFilter ? "MarkUps" : "Dashboard"}
           </h1>
         </div>
         <NewMarkupButton />

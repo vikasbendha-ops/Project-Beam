@@ -39,14 +39,18 @@ interface CanvasTopBarProps {
   siblings: CanvasSibling[];
   workspaceId: string;
   currentUser: CanvasCurrentUser;
+  assets?: { id: string; title: string; position: number }[];
+  activeAssetId?: string | null;
 }
 
 export function CanvasTopBar({
   markup,
   version,
-  siblings,
+  siblings: _siblings,
   workspaceId,
   currentUser,
+  assets = [],
+  activeAssetId = null,
 }: CanvasTopBarProps) {
   const router = useRouter();
   const mode = useCanvasStore((s) => s.mode);
@@ -60,15 +64,18 @@ export function CanvasTopBar({
   const canApprove = currentUser.role !== "guest";
   const canShare = currentUser.role !== "guest";
 
+  // Asset-based prev/next within THIS markup. Other markups never appear
+  // here — siblings live in the dashboard / sidebar only.
   const { idx, prev, next, total } = useMemo(() => {
-    const i = siblings.findIndex((s) => s.id === markup.id);
+    const sorted = [...assets].sort((a, b) => a.position - b.position);
+    const i = sorted.findIndex((a) => a.id === activeAssetId);
     return {
       idx: i,
-      prev: i > 0 ? siblings[i - 1] : null,
-      next: i >= 0 && i < siblings.length - 1 ? siblings[i + 1] : null,
-      total: siblings.length,
+      prev: i > 0 ? sorted[i - 1] : null,
+      next: i >= 0 && i < sorted.length - 1 ? sorted[i + 1] : null,
+      total: sorted.length,
     };
-  }, [siblings, markup.id]);
+  }, [assets, activeAssetId]);
 
   // Wire keyboard shortcuts. Held in a ref so the StatusMenu can populate it
   // once on mount and the keydown handler always sees the latest closure.
@@ -77,10 +84,13 @@ export function CanvasTopBar({
   );
   const prevHrefRef = useRef<string | null>(null);
   const nextHrefRef = useRef<string | null>(null);
+  const assetHref = (assetId: string) =>
+    `/w/${workspaceId}/markup/${markup.id}?asset=${assetId}`;
   useEffect(() => {
-    prevHrefRef.current = prev ? `/w/${workspaceId}/markup/${prev.id}` : null;
-    nextHrefRef.current = next ? `/w/${workspaceId}/markup/${next.id}` : null;
-  }, [prev, next, workspaceId]);
+    prevHrefRef.current = prev ? assetHref(prev.id) : null;
+    nextHrefRef.current = next ? assetHref(next.id) : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prev, next, workspaceId, markup.id]);
 
   useEffect(() => {
     if (!canApprove && !canShare) return;
@@ -198,11 +208,11 @@ export function CanvasTopBar({
               variant="ghost"
               size="icon"
               className="size-6"
-              aria-label="Previous markup"
+              aria-label="Previous asset"
               disabled={!prev}
             >
               {prev ? (
-                <Link href={`/w/${workspaceId}/markup/${prev.id}`}>
+                <Link href={assetHref(prev.id)} scroll={false}>
                   <ChevronLeft className="size-3.5" />
                 </Link>
               ) : (
@@ -212,6 +222,9 @@ export function CanvasTopBar({
               )}
             </Button>
             <span className="tabular-nums">
+              <span className="mr-1 hidden text-[10px] uppercase tracking-wider text-muted-foreground/80 lg:inline">
+                Asset
+              </span>
               {idx + 1} <span className="text-muted-foreground/70">of {total}</span>
             </span>
             <Button
@@ -220,11 +233,11 @@ export function CanvasTopBar({
               variant="ghost"
               size="icon"
               className="size-6"
-              aria-label="Next markup"
+              aria-label="Next asset"
               disabled={!next}
             >
               {next ? (
-                <Link href={`/w/${workspaceId}/markup/${next.id}`}>
+                <Link href={assetHref(next.id)} scroll={false}>
                   <ChevronRight className="size-3.5" />
                 </Link>
               ) : (

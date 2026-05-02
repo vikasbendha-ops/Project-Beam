@@ -75,7 +75,7 @@ export function Sidebar({
       toast.error(error ?? "Couldn't move");
       return;
     }
-    toast.success("Moved to All MarkUps");
+    toast.success("Moved out of folder");
     router.refresh();
   }
 
@@ -142,7 +142,7 @@ export function Sidebar({
           )}
         >
           <Layers className="size-4" strokeWidth={1.5} />
-          All MarkUps
+          Dashboard
         </Link>
 
         {/* Projects */}

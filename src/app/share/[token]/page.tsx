@@ -66,21 +66,25 @@ export default async function SharePage({
       : Promise.resolve({ data: [] }),
   ]);
 
+  // Fetch threads for this view. If the markup has assets, scope to the
+  // active one; otherwise fall back to the markup_id filter so legacy
+  // single-asset markups (or any data that pre-dated the assets table)
+  // still surface comments.
+  const baseThreadQuery = supabase
+    .from("threads")
+    .select(
+      `id, thread_number, x_position, y_position, page_number, status,
+       priority, created_by, guest_name, guest_email, created_at, updated_at,
+       resolved_at,
+       messages!messages_thread_id_fkey (
+         id, content, attachments, mentions, reactions, created_by, guest_name,
+         guest_email, created_at, edited_at, parent_message_id
+       )`,
+    )
+    .order("thread_number", { ascending: true });
   const { data: threads } = await (activeAsset
-    ? supabase
-        .from("threads")
-        .select(
-          `id, thread_number, x_position, y_position, page_number, status,
-           priority, created_by, guest_name, guest_email, created_at, updated_at,
-           resolved_at,
-           messages!messages_thread_id_fkey (
-             id, content, attachments, mentions, reactions, created_by, guest_name,
-             guest_email, created_at, edited_at, parent_message_id
-           )`,
-        )
-        .eq("asset_id", activeAsset.id)
-        .order("thread_number", { ascending: true })
-    : Promise.resolve({ data: [] }));
+    ? baseThreadQuery.eq("asset_id", activeAsset.id)
+    : baseThreadQuery.eq("markup_id", markup.id));
 
   const authorIds = Array.from(
     new Set([

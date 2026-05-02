@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -56,6 +56,11 @@ export function NewMarkupModal({
   folderId = null,
 }: NewMarkupModalProps) {
   const router = useRouter();
+  // Pick up ?project=<id> from the dashboard URL so a MarkUp uploaded from
+  // a project view actually lands in that project (not the workspace
+  // default).
+  const search = useSearchParams();
+  const projectId = search.get("project");
   const open = useUIStore((s) => s.newMarkupOpen);
   const tab = useUIStore((s) => s.newMarkupTab);
   const setNewMarkupOpen = useUIStore((s) => s.setNewMarkupOpen);
@@ -87,6 +92,7 @@ export function NewMarkupModal({
             <FileTab
               workspaceId={workspaceId}
               folderId={folderId}
+              projectId={projectId}
               onCreated={(id) => {
                 setNewMarkupOpen(false);
                 router.push(`/w/${workspaceId}/markup/${id}`);
@@ -100,6 +106,7 @@ export function NewMarkupModal({
             <UrlTab
               workspaceId={workspaceId}
               folderId={folderId}
+              projectId={projectId}
               onCreated={(id) => {
                 setNewMarkupOpen(false);
                 router.push(`/w/${workspaceId}/markup/${id}`);
@@ -117,11 +124,13 @@ export function NewMarkupModal({
 function UrlTab({
   workspaceId,
   folderId,
+  projectId,
   onCreated,
   onCancel,
 }: {
   workspaceId: string;
   folderId: string | null;
+  projectId: string | null;
   onCreated: (id: string) => void;
   onCancel: () => void;
 }) {
@@ -142,6 +151,7 @@ function UrlTab({
       body: JSON.stringify({
         workspace_id: workspaceId,
         folder_id: folderId,
+        project_id: projectId ?? undefined,
         type: "website",
         source_url: url,
         title: values.title?.trim() || new URL(url).hostname,
@@ -219,11 +229,13 @@ type GroupMode = "bundle" | "separate";
 function FileTab({
   workspaceId,
   folderId,
+  projectId,
   onCreated,
   onCancel,
 }: {
   workspaceId: string;
   folderId: string | null;
+  projectId: string | null;
   onCreated: (id: string) => void;
   onCancel: () => void;
 }) {
@@ -386,6 +398,7 @@ function FileTab({
           body: JSON.stringify({
             workspace_id: workspaceId,
             folder_id: folderId,
+            project_id: projectId ?? undefined,
             type: primaryType,
             title:
               bundleTitle.trim() ||
@@ -423,6 +436,7 @@ function FileTab({
           body: JSON.stringify({
             workspace_id: workspaceId,
             folder_id: folderId,
+            project_id: projectId ?? undefined,
             type,
             title: u.file.name.replace(/\.[^.]+$/, ""),
             file: meta,

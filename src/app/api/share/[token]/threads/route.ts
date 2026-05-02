@@ -61,11 +61,21 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
       { status: 400 },
     );
 
+  // Resolve current version of the primary asset so guest pins land on a
+  // version (compare views need this to scope correctly).
+  const { data: currentVersion } = await supabase
+    .from("markup_versions")
+    .select("id")
+    .eq("asset_id", primaryAsset.id)
+    .eq("is_current", true)
+    .maybeSingle();
+
   const { data: thread, error: threadError } = await supabase
     .from("threads")
     .insert({
       markup_id: share.markup_id,
       asset_id: primaryAsset.id,
+      markup_version_id: currentVersion?.id ?? null,
       thread_number: threadNumber,
       x_position,
       y_position,

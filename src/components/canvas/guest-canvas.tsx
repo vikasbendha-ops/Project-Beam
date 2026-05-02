@@ -10,8 +10,10 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { AssetRail } from "@/components/canvas/asset-rail";
 import { GuestCommentList } from "@/components/canvas/guest-comment-list";
+import { createClient } from "@/lib/supabase/client";
 import { GuestIdentityModal } from "@/components/canvas/guest-identity-modal";
 import { GuestPinComposer } from "@/components/canvas/guest-pin-composer";
 import { GuestVersionRail } from "@/components/canvas/guest-version-rail";
@@ -103,10 +105,42 @@ export function GuestCanvas({
   assets = [],
   activeAssetId = null,
 }: GuestCanvasProps) {
+  const router = useRouter();
   const isMobile = useIsMobile();
   const { identity, save, prompt, setPrompt } = useGuestIdentity();
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
+
+  // Live updates: subscribe to threads + messages on this markup so guests
+  // see owner / other-guest comments without manually refreshing. We trigger
+  // a server refresh on any insert/update/delete and let the page re-fetch
+  // (server-rendered with current scope is the source of truth).
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`guest:${markup.id}:${activeAssetId ?? "all"}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "threads",
+          filter: activeAssetId
+            ? `asset_id=eq.${activeAssetId}`
+            : `markup_id=eq.${markup.id}`,
+        },
+        () => router.refresh(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "messages" },
+        () => router.refresh(),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [markup.id, activeAssetId, router]);
 
   const profileMap = useMemo(() => {
     const m: Record<string, CanvasProfile> = {};

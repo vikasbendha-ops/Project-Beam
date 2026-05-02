@@ -556,7 +556,12 @@ function PreviewPane({
            confusing because both panes ended up identical. */}
         <ComparePinOverlay
           threads={threads.filter(
-            (t) => t.markup_version_id === version.id,
+            // Show pins that belong to this version. Threads with NULL
+            // version (legacy/unmigrated rows) appear on every version
+            // so they're not lost.
+            (t) =>
+              t.markup_version_id === version.id ||
+              t.markup_version_id == null,
           )}
           activeVersionId={version.id}
           versionNumberById={versionNumberById}

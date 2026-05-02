@@ -86,11 +86,25 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
 
+  // Resolve version id: explicit > active asset's current version. Threads
+  // are tied to a version so single-version + compare views can scope pins
+  // correctly later.
+  let resolvedVersionId = markup_version_id ?? null;
+  if (!resolvedVersionId) {
+    const { data: currentVersion } = await supabase
+      .from("markup_versions")
+      .select("id")
+      .eq("asset_id", resolvedAssetId)
+      .eq("is_current", true)
+      .maybeSingle();
+    resolvedVersionId = currentVersion?.id ?? null;
+  }
+
   const { data: thread, error: threadError } = await supabase
     .from("threads")
     .insert({
       markup_id,
-      markup_version_id: markup_version_id ?? null,
+      markup_version_id: resolvedVersionId,
       asset_id: resolvedAssetId,
       thread_number: threadNumber,
       x_position,

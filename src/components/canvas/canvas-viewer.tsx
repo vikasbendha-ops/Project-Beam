@@ -207,6 +207,8 @@ function CanvasViewerInner({
         siblings={siblings}
         workspaceId={workspaceId}
         currentUser={currentUser}
+        assets={assets}
+        activeAssetId={activeAssetId}
       />
       <div className="flex flex-1 overflow-hidden">
         {!isMobile ? (
@@ -263,6 +265,7 @@ function CanvasViewerInner({
             />
           )}
           <ZoomControls />
+          <BrowseModeBadge />
         </main>
         {/* Right rail: ALWAYS shows assets within THIS markup. Other-markup
              siblings live in the sidebar / dashboard, never inside another
@@ -283,6 +286,35 @@ function CanvasViewerInner({
           markupId={markup.id}
         />
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Floating pill that confirms Browse mode is active. Sits at canvas
+ * bottom so it doesn't fight the comment composer (top) or zoom controls
+ * (right). Hidden when mode === "comment".
+ */
+function BrowseModeBadge() {
+  const mode = useCanvasStore((s) => s.mode);
+  const setMode = useCanvasStore((s) => s.setMode);
+  if (mode !== "browse") return null;
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
+      <button
+        type="button"
+        onClick={() => setMode("comment")}
+        className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-foreground/20 bg-foreground/95 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-background shadow-modal hover:bg-foreground"
+      >
+        <span className="relative flex size-1.5">
+          <span className="absolute inset-0 animate-ping rounded-full bg-background opacity-60" />
+          <span className="relative size-1.5 rounded-full bg-background" />
+        </span>
+        Browse mode · clicks won&rsquo;t drop pins
+        <span className="ml-1 rounded bg-background/20 px-1 py-0.5 font-mono text-[9px]">
+          C
+        </span>
+      </button>
     </div>
   );
 }
