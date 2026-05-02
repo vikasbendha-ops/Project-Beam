@@ -62,7 +62,7 @@ export function NewMarkupModal({
 
   return (
     <Dialog open={open} onOpenChange={(o) => setNewMarkupOpen(o)}>
-      <DialogContent className="max-w-[600px] gap-0 overflow-hidden p-0">
+      <DialogContent className="w-[min(640px,calc(100%-2rem))] !max-w-none gap-0 overflow-hidden p-0 sm:w-[600px]">
         <DialogHeader className="border-b border-border p-6 pb-4">
           <DialogTitle className="text-xl">New MarkUp</DialogTitle>
           <DialogDescription>

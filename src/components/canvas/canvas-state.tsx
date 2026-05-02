@@ -10,6 +10,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import type {
@@ -54,31 +55,69 @@ function reducer(state: CanvasThread[], action: Action): CanvasThread[] {
     case "REMOVE_THREAD":
       return state.filter((t) => t.id !== action.threadId);
     case "ADD_MESSAGE": {
-      return state.map((t) =>
-        t.id === action.threadId
-          ? {
-              ...t,
-              messages: [
-                ...((t.messages ?? []).filter(
-                  (m) => m.id !== action.message.id,
-                )),
-                action.message,
-              ],
-            }
-          : t,
-      );
+      return state.map((t) => {
+        if (t.id !== action.threadId) return t;
+        const existing = t.messages ?? [];
+        // Already in state by exact id — no-op.
+        if (existing.some((m) => m.id === action.message.id)) {
+          return t;
+        }
+        // Realtime INSERT arrived for a message we already added optimistically.
+        // Resolve the temp (id starts with 'tmp_') by matching content + author
+        // instead of duplicating. Pure-replace-by-id leaves orphaned temps.
+        const incomingIsReal = !action.message.id.startsWith("tmp_");
+        if (incomingIsReal) {
+          const tempIdx = existing.findIndex(
+            (m) =>
+              m.id.startsWith("tmp_") &&
+              m.content === action.message.content &&
+              m.created_by === action.message.created_by &&
+              m.guest_name === action.message.guest_name,
+          );
+          if (tempIdx >= 0) {
+            const next = [...existing];
+            next[tempIdx] = action.message;
+            return { ...t, messages: next };
+          }
+        }
+        return { ...t, messages: [...existing, action.message] };
+      });
     }
     case "REPLACE_MESSAGE": {
-      return state.map((t) =>
-        t.id === action.threadId
-          ? {
-              ...t,
-              messages: (t.messages ?? []).map((m) =>
-                m.id === action.tempId ? action.message : m,
-              ),
-            }
-          : t,
-      );
+      return state.map((t) => {
+        if (t.id !== action.threadId) return t;
+        const existing = t.messages ?? [];
+        const idx = existing.findIndex((m) => m.id === action.tempId);
+        if (idx >= 0) {
+          const next = [...existing];
+          next[idx] = action.message;
+          return { ...t, messages: next };
+        }
+        // Realtime UPDATE arriving for a message we don't have in state.
+        // Self-heal by trying to resolve a matching temp; otherwise add.
+        if (existing.some((m) => m.id === action.message.id)) {
+          // Already present (race) — overwrite in place.
+          return {
+            ...t,
+            messages: existing.map((m) =>
+              m.id === action.message.id ? action.message : m,
+            ),
+          };
+        }
+        const tempIdx = existing.findIndex(
+          (m) =>
+            m.id.startsWith("tmp_") &&
+            m.content === action.message.content &&
+            m.created_by === action.message.created_by &&
+            m.guest_name === action.message.guest_name,
+        );
+        if (tempIdx >= 0) {
+          const next = [...existing];
+          next[tempIdx] = action.message;
+          return { ...t, messages: next };
+        }
+        return { ...t, messages: [...existing, action.message] };
+      });
     }
     case "REMOVE_MESSAGE":
       return state.map((t) =>
@@ -181,17 +220,20 @@ export function CanvasStateProvider({
   currentUserName,
   children,
 }: CanvasStateProviderProps) {
+  const router = useRouter();
   const [threads, dispatch] = useReducer(reducer, initialThreads);
 
-  // Re-seed from server props if the page navigates between markups (the
-  // server component re-renders with new initialThreads).
-  const seededRef = useRef<string>(markupId);
+  // Re-seed from server props if the page navigates between markups OR
+  // between assets within the same markup (the server component
+  // re-renders with new initialThreads each time).
+  const seedKey = `${markupId}::${assetId ?? ""}`;
+  const seededRef = useRef<string>(seedKey);
   useEffect(() => {
-    if (seededRef.current !== markupId) {
-      seededRef.current = markupId;
+    if (seededRef.current !== seedKey) {
+      seededRef.current = seedKey;
       dispatch({ type: "REPLACE", threads: initialThreads });
     }
-  }, [markupId, initialThreads]);
+  }, [seedKey, initialThreads]);
 
   // Realtime: subscribe to threads + messages for this markup. Merge new
   // rows into local state instead of refreshing the page.
@@ -400,12 +442,15 @@ export function CanvasStateProvider({
         });
         return body.thread_id;
       } catch (err) {
+        // Same logic as postReply: insert may or may not have landed. Strip
+        // optimistic, refresh from server.
         dispatch({ type: "REMOVE_THREAD", threadId: tempThreadId });
+        router.refresh();
         toast.error(err instanceof Error ? err.message : "Couldn't drop pin");
         return null;
       }
     },
-    [markupId, versionId, assetId, threads, currentUser.id],
+    [markupId, versionId, assetId, threads, currentUser.id, router],
   );
 
   const postReply = useCallback(
@@ -448,16 +493,21 @@ export function CanvasStateProvider({
           message: { ...tempMessage, id },
         });
       } catch (err) {
+        // We don't know if the insert actually landed (network blip mid-INSERT
+        // is possible). Strip the optimistic + ask the server for the truth —
+        // if the row IS in DB, it'll come back through initialThreads and
+        // REPLACE re-seeds it.
         dispatch({
           type: "REMOVE_MESSAGE",
           threadId,
           messageId: tempId,
         });
+        router.refresh();
         toast.error(err instanceof Error ? err.message : "Couldn't post");
         throw err;
       }
     },
-    [currentUser.id],
+    [currentUser.id, router],
   );
 
   const setThreadStatus = useCallback(

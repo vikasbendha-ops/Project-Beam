@@ -85,7 +85,10 @@ export function Composer({
     setContent(next);
     const caret = e.target.selectionStart ?? next.length;
     const m = detectMention(next, caret);
-    if (!m || members.length === 0) {
+    // Always show the popover when @ is detected — even with zero members —
+    // so the user gets a clear "mentions are workspace-only" hint instead
+    // of silent nothing.
+    if (!m) {
       setMentionAt(null);
       setMentionMatches([]);
       return;
@@ -388,6 +391,22 @@ export function Composer({
         </Button>
       </div>
 
+      {mentionAt != null && mentionMatches.length === 0 ? (
+        <div className="absolute bottom-[calc(100%+4px)] left-3 z-20 w-72 overflow-hidden rounded-lg border border-border bg-card p-3 text-xs shadow-lg">
+          <p className="font-semibold text-foreground">No matching members</p>
+          <p className="mt-1 leading-relaxed text-muted-foreground">
+            Mentions only fire for workspace members.{" "}
+            <span className="text-foreground">
+              Invite someone first
+            </span>{" "}
+            from{" "}
+            <span className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">
+              People → Invite
+            </span>{" "}
+            and they&rsquo;ll appear here.
+          </p>
+        </div>
+      ) : null}
       {mentionAt != null && mentionMatches.length > 0 ? (
         <div className="absolute bottom-[calc(100%+4px)] left-3 z-20 w-64 overflow-hidden rounded-lg border border-border bg-card shadow-lg">
           <ul role="listbox" className="max-h-56 overflow-auto py-1">

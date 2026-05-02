@@ -8,7 +8,6 @@ import { CanvasTopBar } from "@/components/canvas/canvas-top-bar";
 import { CommentPanel } from "@/components/canvas/comment-panel";
 import { CommentBottomSheet } from "@/components/canvas/comment-bottom-sheet";
 import { ImageCanvas } from "@/components/canvas/image-canvas";
-import { MarkupRail } from "@/components/canvas/markup-rail";
 import { PendingPinComposer } from "@/components/canvas/pending-pin-composer";
 import { SiblingPreloader } from "@/components/canvas/sibling-preloader";
 import { ThreadPopover } from "@/components/canvas/thread-popover";
@@ -209,7 +208,6 @@ function CanvasViewerInner({
         workspaceId={workspaceId}
         currentUser={currentUser}
       />
-      <AssetRail assets={assets} activeAssetId={activeAssetId} />
       <div className="flex flex-1 overflow-hidden">
         {!isMobile ? (
           <CommentPanel
@@ -266,11 +264,14 @@ function CanvasViewerInner({
           )}
           <ZoomControls />
         </main>
-        {!isMobile ? (
-          <MarkupRail
-            workspaceId={workspaceId}
-            siblings={siblings}
-            currentId={markup.id}
+        {/* Right rail: ALWAYS shows assets within THIS markup. Other-markup
+             siblings live in the sidebar / dashboard, never inside another
+             markup's canvas. */}
+        {!isMobile && assets.length > 1 ? (
+          <AssetRail
+            assets={assets}
+            activeAssetId={activeAssetId}
+            orientation="vertical"
           />
         ) : null}
       </div>

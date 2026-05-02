@@ -236,14 +236,19 @@ export function CanvasTopBar({
           </div>
         ) : null}
 
-        <div className="flex items-center gap-1 rounded-full border border-border bg-muted p-1">
+        <div
+          className="flex items-center gap-1 rounded-full border border-border bg-muted p-1"
+          title="Comment: click to drop a pin · Browse: explore without dropping pins"
+        >
           <button
             type="button"
             onClick={() => setMode("comment")}
+            aria-pressed={mode === "comment"}
+            title="Comment mode (c) — click anywhere to drop a pin"
             className={cn(
               "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors",
               mode === "comment"
-                ? "bg-card text-foreground shadow-sm"
+                ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
@@ -252,10 +257,12 @@ export function CanvasTopBar({
           <button
             type="button"
             onClick={() => setMode("browse")}
+            aria-pressed={mode === "browse"}
+            title="Browse mode — read without accidental pins; clicks pass through to embedded content"
             className={cn(
               "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors",
               mode === "browse"
-                ? "bg-card text-foreground shadow-sm"
+                ? "bg-foreground text-background shadow-sm"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >

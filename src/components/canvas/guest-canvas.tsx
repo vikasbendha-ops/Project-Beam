@@ -206,10 +206,6 @@ export function GuestCanvas({
         </div>
       </header>
 
-      {assets.length > 1 ? (
-        <AssetRail assets={assets} activeAssetId={activeAssetId} />
-      ) : null}
-
       <div className="relative flex flex-1 overflow-hidden">
         {/* Left drawer — comments */}
         <DrawerSidebar
@@ -295,6 +291,16 @@ export function GuestCanvas({
             </div>
           ) : null}
         </main>
+
+        {/* Persistent right rail: assets within this markup. Always shown
+             when 2+ assets exist. */}
+        {assets.length > 1 ? (
+          <AssetRail
+            assets={assets}
+            activeAssetId={activeAssetId}
+            orientation="vertical"
+          />
+        ) : null}
 
         {/* Right drawer — versions */}
         {hasVariations ? (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   AtSign,
   CheckCircle2,
@@ -17,6 +17,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/types/database";
 
@@ -93,31 +94,56 @@ export function ActivityDrawer({
   const [profiles, setProfiles] = useState<ActivityProfile[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  // Single fetch fn so the realtime subscription + the open-effect share
+  // logic.
+  const refetch = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/markups/${markupId}/activity`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = (await res.json()) as {
+        rows: ActivityRow[];
+        profiles: ActivityProfile[];
+      };
+      setRows(json.rows);
+      setProfiles(json.profiles);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load");
+    }
+  }, [markupId]);
+
   // Lazy-load on first open + refetch when re-opened (cheap, last 80 rows).
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
-    setError(null);
-    (async () => {
-      try {
-        const res = await fetch(`/api/markups/${markupId}/activity`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = (await res.json()) as {
-          rows: ActivityRow[];
-          profiles: ActivityProfile[];
-        };
-        if (cancelled) return;
-        setRows(json.rows);
-        setProfiles(json.profiles);
-      } catch (err) {
-        if (cancelled) return;
-        setError(err instanceof Error ? err.message : "Failed to load");
-      }
-    })();
+    void refetch();
+  }, [open, refetch]);
+
+  // While open, subscribe to notifications inserts on this markup so the
+  // feed updates live as actions happen elsewhere.
+  useEffect(() => {
+    if (!open) return;
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`activity:${markupId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `markup_id=eq.${markupId}`,
+        },
+        () => {
+          // Cheapest path: refetch the full last-80 list. The endpoint joins
+          // profile + markup name for us.
+          void refetch();
+        },
+      )
+      .subscribe();
     return () => {
-      cancelled = true;
+      supabase.removeChannel(channel);
     };
-  }, [markupId, open]);
+  }, [open, markupId, refetch]);
 
   // Esc close.
   useEffect(() => {

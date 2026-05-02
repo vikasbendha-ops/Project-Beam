@@ -426,11 +426,25 @@ export function VersionHistoryView({
                   />
                 </div>
               ) : (
-                <div className="flex flex-1 overflow-hidden">
+                <div className="relative flex flex-1 overflow-hidden">
                   <VersionPreview
                     url={selected.signed_url}
                     mime={selected.mime_type}
                     fileName={selected.file_name}
+                  />
+                  {/* Read-only pin overlay for THIS version only. */}
+                  <ComparePinOverlay
+                    threads={threads.filter(
+                      (t) => t.markup_version_id === selected.id,
+                    )}
+                    activeVersionId={selected.id}
+                    versionNumberById={versions.reduce<Record<string, number>>(
+                      (acc, v) => {
+                        acc[v.id] = v.version_number;
+                        return acc;
+                      },
+                      {},
+                    )}
                   />
                 </div>
               )}
@@ -537,8 +551,13 @@ function PreviewPane({
           mime={version.mime_type}
           fileName={version.file_name}
         />
+        {/* Each pane shows ONLY its own version's pins. Comments belong to
+           the version they were written on; cross-version overlay was
+           confusing because both panes ended up identical. */}
         <ComparePinOverlay
-          threads={threads}
+          threads={threads.filter(
+            (t) => t.markup_version_id === version.id,
+          )}
           activeVersionId={version.id}
           versionNumberById={versionNumberById}
         />
@@ -594,15 +613,15 @@ function ComparePinOverlay({
             >
               <span
                 className={cn(
-                  "flex size-6 items-center justify-center rounded-full text-[10px] font-bold transition-transform group-hover/pin:scale-110",
+                  "relative flex size-7 items-center justify-center rounded-full text-[11px] font-bold transition-transform group-hover/pin:scale-110",
                   isOwnVersion
                     ? "bg-primary text-primary-foreground shadow-pin"
-                    : "border-2 border-primary/50 bg-card text-primary",
+                    : "border-2 border-primary/40 bg-card/80 text-primary opacity-60",
                   t.status === "resolved" && isOwnVersion
                     ? "bg-emerald-500"
                     : "",
                   t.status === "resolved" && !isOwnVersion
-                    ? "border-emerald-500/50 text-emerald-700"
+                    ? "border-emerald-500/40 text-emerald-700"
                     : "",
                 )}
                 style={{
@@ -611,6 +630,18 @@ function ComparePinOverlay({
                 }}
               >
                 {t.thread_number}
+                {vNum ? (
+                  <span
+                    className={cn(
+                      "absolute -bottom-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-1 font-mono text-[8px] font-bold tabular-nums leading-none ring-2 ring-background",
+                      isOwnVersion
+                        ? "bg-foreground text-background"
+                        : "bg-amber-500 text-white",
+                    )}
+                  >
+                    v{vNum}
+                  </span>
+                ) : null}
               </span>
               {/* Hover preview */}
               <div className="pointer-events-none absolute left-7 top-0 z-10 hidden w-56 rounded-[10px] border border-border bg-card p-2.5 shadow-modal group-hover/pin:block">
