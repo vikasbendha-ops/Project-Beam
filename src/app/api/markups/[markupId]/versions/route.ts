@@ -50,26 +50,45 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
       { status: 403 },
     );
 
-  // Compute next version_number.
+  // Resolve target asset: explicit > primary (position 0).
+  let assetId = parsed.data.asset_id ?? null;
+  if (!assetId) {
+    const { data: primary } = await supabase
+      .from("assets")
+      .select("id")
+      .eq("markup_id", markupId)
+      .order("position", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    assetId = primary?.id ?? null;
+  }
+  if (!assetId)
+    return NextResponse.json(
+      { error: "Markup has no asset to version." },
+      { status: 400 },
+    );
+
+  // Per-asset version numbering. Each asset has its own v1 → vN sequence.
   const { data: latest } = await supabase
     .from("markup_versions")
     .select("version_number")
-    .eq("markup_id", markupId)
+    .eq("asset_id", assetId)
     .order("version_number", { ascending: false })
     .limit(1)
     .maybeSingle();
   const nextNumber = (latest?.version_number ?? 0) + 1;
 
-  // Flip all prior versions to is_current=false.
+  // Only flip current within THIS asset.
   await supabase
     .from("markup_versions")
     .update({ is_current: false })
-    .eq("markup_id", markupId);
+    .eq("asset_id", assetId);
 
   const { data: created, error: insertError } = await supabase
     .from("markup_versions")
     .insert({
       markup_id: markupId,
+      asset_id: assetId,
       version_number: nextNumber,
       file_url: parsed.data.storage_path,
       file_name: parsed.data.file_name,

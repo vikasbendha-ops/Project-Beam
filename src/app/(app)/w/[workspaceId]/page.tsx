@@ -23,7 +23,12 @@ const STATUS_VALUES: ReadonlyArray<MarkupStatus> = [
 
 interface WorkspacePageProps {
   params: Promise<{ workspaceId: string }>;
-  searchParams: Promise<{ status?: string; q?: string; sort?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    q?: string;
+    sort?: string;
+    project?: string;
+  }>;
 }
 
 const SORT_KEYS = ["updated", "created", "comments", "review"] as const;
@@ -60,14 +65,19 @@ export default async function WorkspaceDashboard({
       ? (sp.sort as SortKey)
       : "updated";
 
-  // Top-level markups (folder_id is null) for this workspace.
-  // Use the markup_summary view so we get comment counts etc.
+  // Project filter: ?project=<id> narrows to one project; otherwise show
+  // all markups across the workspace (the "All MarkUps" view).
+  const projectFilter = sp.project ?? null;
+  // When a project is selected, show only top-level markups inside it
+  // (folders break the list out into sub-pages). Without a project filter,
+  // show all top-level markups workspace-wide.
   let query = supabase
     .from("markup_summary")
     .select("*")
     .eq("workspace_id", workspace.id)
     .is("folder_id", null)
     .limit(60);
+  if (projectFilter) query = query.eq("project_id", projectFilter);
   if (sortKey === "comments") {
     query = query
       .order("thread_count", { ascending: false, nullsFirst: false })
@@ -123,10 +133,12 @@ export default async function WorkspaceDashboard({
           <nav className="mb-2 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             <span>{workspace.name}</span>
             <ChevronRight className="size-3.5" />
-            <span className="text-foreground">All Projects</span>
+            <span className="text-foreground">
+              {projectFilter ? "Project" : "All MarkUps"}
+            </span>
           </nav>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            Markups
+            {projectFilter ? "MarkUps" : "All MarkUps"}
           </h1>
         </div>
         <NewMarkupButton />

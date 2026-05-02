@@ -45,10 +45,27 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
     .eq("markup_id", share.markup_id);
   const threadNumber = (count ?? 0) + 1;
 
+  // Resolve primary asset for the markup so threads land correctly even
+  // for guest comments. Multi-asset guest UI is future work; for now guests
+  // always pin against the primary asset.
+  const { data: primaryAsset } = await supabase
+    .from("assets")
+    .select("id")
+    .eq("markup_id", share.markup_id)
+    .order("position", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (!primaryAsset?.id)
+    return NextResponse.json(
+      { error: "Markup has no asset to attach this thread to." },
+      { status: 400 },
+    );
+
   const { data: thread, error: threadError } = await supabase
     .from("threads")
     .insert({
       markup_id: share.markup_id,
+      asset_id: primaryAsset.id,
       thread_number: threadNumber,
       x_position,
       y_position,

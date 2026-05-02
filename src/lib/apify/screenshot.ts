@@ -147,20 +147,38 @@ export async function persistRunScreenshot(args: {
     .update({ thumbnail_url: signed?.signedUrl ?? null })
     .eq("id", args.markupId);
 
+  // Resolve the primary asset for this markup. Created at markup-creation
+  // time even for websites — the screenshot version attaches to it.
+  const { data: primary } = await supabase
+    .from("assets")
+    .select("id")
+    .eq("markup_id", args.markupId)
+    .order("position", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (!primary?.id) return;
+
+  // Mirror thumbnail to the primary asset row so the asset rail shows it.
+  if (signed?.signedUrl) {
+    await supabase
+      .from("assets")
+      .update({ thumbnail_url: signed.signedUrl })
+      .eq("id", primary.id);
+  }
+
   // Idempotent: a re-fired webhook should refresh, not duplicate, the row.
-  await supabase
-    .from("markup_versions")
-    .upsert(
-      {
-        markup_id: args.markupId,
-        version_number: 1,
-        file_url: path,
-        file_name: "screenshot.png",
-        mime_type: "image/png",
-        file_size: bytes.byteLength,
-        uploaded_by: args.uploadedBy,
-        is_current: true,
-      },
-      { onConflict: "markup_id,version_number" },
-    );
+  await supabase.from("markup_versions").upsert(
+    {
+      markup_id: args.markupId,
+      asset_id: primary.id,
+      version_number: 1,
+      file_url: path,
+      file_name: "screenshot.png",
+      mime_type: "image/png",
+      file_size: bytes.byteLength,
+      uploaded_by: args.uploadedBy,
+      is_current: true,
+    },
+    { onConflict: "asset_id,version_number" },
+  );
 }

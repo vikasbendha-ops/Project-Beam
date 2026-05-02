@@ -4,6 +4,7 @@ interface FlatFolder {
   id: string;
   name: string;
   parent_folder_id: string | null;
+  project_id?: string | null;
 }
 
 /**
@@ -16,6 +17,7 @@ export function buildFolderTree(flat: FlatFolder[]): FolderNode[] {
       id: f.id,
       name: f.name,
       parent_folder_id: f.parent_folder_id,
+      project_id: f.project_id ?? null,
       children: [],
     });
   }

@@ -10,6 +10,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import { AssetRail } from "@/components/canvas/asset-rail";
 import { GuestCommentList } from "@/components/canvas/guest-comment-list";
 import { GuestIdentityModal } from "@/components/canvas/guest-identity-modal";
 import { GuestPinComposer } from "@/components/canvas/guest-pin-composer";
@@ -71,6 +72,14 @@ interface GuestVersionRow {
   created_at: string;
 }
 
+interface GuestAsset {
+  id: string;
+  position: number;
+  title: string;
+  type: string;
+  thumbnail_url: string | null;
+}
+
 interface GuestCanvasProps {
   shareToken: string;
   canComment: boolean;
@@ -79,6 +88,8 @@ interface GuestCanvasProps {
   versions: GuestVersionRow[];
   threads: CanvasThread[];
   profiles: CanvasProfile[];
+  assets?: GuestAsset[];
+  activeAssetId?: string | null;
 }
 
 export function GuestCanvas({
@@ -89,6 +100,8 @@ export function GuestCanvas({
   versions,
   threads,
   profiles,
+  assets = [],
+  activeAssetId = null,
 }: GuestCanvasProps) {
   const isMobile = useIsMobile();
   const { identity, save, prompt, setPrompt } = useGuestIdentity();
@@ -192,6 +205,10 @@ export function GuestCanvas({
           </Button>
         </div>
       </header>
+
+      {assets.length > 1 ? (
+        <AssetRail assets={assets} activeAssetId={activeAssetId} />
+      ) : null}
 
       <div className="relative flex flex-1 overflow-hidden">
         {/* Left drawer — comments */}

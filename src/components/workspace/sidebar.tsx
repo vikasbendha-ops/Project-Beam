@@ -3,7 +3,18 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Archive, FolderOpen, Settings, Star, Users } from "lucide-react";
+import {
+  Archive,
+  ChevronDown,
+  ChevronRight,
+  FolderOpen,
+  Layers,
+  Loader2,
+  Plus,
+  Settings,
+  Star,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   WorkspaceSwitcher,
@@ -16,10 +27,17 @@ import {
 } from "@/components/workspace/folder-tree";
 import { cn } from "@/lib/utils";
 
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  color: string | null;
+}
+
 interface SidebarProps {
   current: WorkspaceSummary;
   workspaces: WorkspaceSummary[];
   folders?: FolderNode[];
+  projects?: ProjectSummary[];
   className?: string;
 }
 
@@ -27,45 +45,23 @@ export function Sidebar({
   current,
   workspaces,
   folders = [],
+  projects = [],
   className,
 }: SidebarProps) {
   const base = `/w/${current.id}`;
   const pathname = usePathname();
   const router = useRouter();
-  const [allProjectsDragOver, setAllProjectsDragOver] = useState(false);
+  const [allDragOver, setAllDragOver] = useState(false);
+  const [creatingProject, setCreatingProject] = useState(false);
 
-  const items: {
+  const filterItems: {
     href: string;
     label: string;
     icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
-    exact: boolean;
-    droppableFolderId?: string | null;
   }[] = [
-    {
-      href: base,
-      label: "All Projects",
-      icon: FolderOpen,
-      exact: true,
-      droppableFolderId: null,
-    },
-    {
-      href: `${base}?filter=shared`,
-      label: "Shared with me",
-      icon: Users,
-      exact: false,
-    },
-    {
-      href: `${base}?filter=favorites`,
-      label: "Favorites",
-      icon: Star,
-      exact: false,
-    },
-    {
-      href: `${base}?filter=archive`,
-      label: "Archive",
-      icon: Archive,
-      exact: false,
-    },
+    { href: `${base}?filter=shared`, label: "Shared with me", icon: Users },
+    { href: `${base}?filter=favorites`, label: "Favorites", icon: Star },
+    { href: `${base}?filter=archive`, label: "Archive", icon: Archive },
   ];
 
   async function moveToRoot(markupId: string) {
@@ -79,8 +75,33 @@ export function Sidebar({
       toast.error(error ?? "Couldn't move");
       return;
     }
-    toast.success("Moved to All Projects");
+    toast.success("Moved to All MarkUps");
     router.refresh();
+  }
+
+  async function createProject() {
+    const name = window.prompt("Project name");
+    if (!name?.trim()) return;
+    setCreatingProject(true);
+    try {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          workspace_id: current.id,
+          name: name.trim(),
+        }),
+      });
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({}));
+        toast.error(error ?? "Couldn't create project");
+        return;
+      }
+      toast.success("Project created");
+      router.refresh();
+    } finally {
+      setCreatingProject(false);
+    }
   }
 
   return (
@@ -95,59 +116,87 @@ export function Sidebar({
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
-        {items.map((item) => {
-          const isActive = item.exact
-            ? pathname === item.href.split("?")[0]
-            : false;
-          const isAllProjects = item.label === "All Projects";
-          const isDroppable = item.droppableFolderId === null;
+        {/* Workspace-wide all-markups view */}
+        <Link
+          href={base}
+          onDragOver={(e) => {
+            if (!e.dataTransfer.types.includes(MARKUP_DRAG_TYPE)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            if (!allDragOver) setAllDragOver(true);
+          }}
+          onDragLeave={() => setAllDragOver(false)}
+          onDrop={(e) => {
+            if (!e.dataTransfer.types.includes(MARKUP_DRAG_TYPE)) return;
+            e.preventDefault();
+            setAllDragOver(false);
+            const id = e.dataTransfer.getData(MARKUP_DRAG_TYPE);
+            if (id) void moveToRoot(id);
+          }}
+          className={cn(
+            "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+            pathname === base
+              ? "bg-card text-primary shadow-sm"
+              : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
+            allDragOver && "bg-accent ring-2 ring-primary",
+          )}
+        >
+          <Layers className="size-4" strokeWidth={1.5} />
+          All MarkUps
+        </Link>
 
-          return (
+        {/* Projects */}
+        <div className="mt-3">
+          <div className="flex items-center justify-between px-3 py-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Projects
+            </span>
+            <button
+              type="button"
+              aria-label="New project"
+              onClick={createProject}
+              disabled={creatingProject}
+              className="flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-card/60 hover:text-foreground disabled:opacity-50"
+            >
+              {creatingProject ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Plus className="size-3.5" strokeWidth={2} />
+              )}
+            </button>
+          </div>
+          {projects.length === 0 ? (
+            <p className="px-3 py-1.5 text-xs text-muted-foreground/70">
+              No projects yet.
+            </p>
+          ) : (
+            projects.map((p) => (
+              <ProjectRow
+                key={p.id}
+                workspaceId={current.id}
+                project={p}
+                folders={folders.filter(
+                  (f) =>
+                    (f as FolderNode & { project_id?: string }).project_id ===
+                    p.id,
+                )}
+              />
+            ))
+          )}
+        </div>
+
+        {/* Filters */}
+        <div className="mt-3 flex flex-col gap-1 border-t border-border pt-3">
+          {filterItems.map((item) => (
             <Link
               key={item.label}
               href={item.href}
-              onDragOver={(e) => {
-                if (!isDroppable) return;
-                if (!e.dataTransfer.types.includes(MARKUP_DRAG_TYPE)) return;
-                e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
-                if (isAllProjects && !allProjectsDragOver) setAllProjectsDragOver(true);
-              }}
-              onDragLeave={() =>
-                isAllProjects && setAllProjectsDragOver(false)
-              }
-              onDrop={(e) => {
-                if (!isDroppable) return;
-                if (!e.dataTransfer.types.includes(MARKUP_DRAG_TYPE)) return;
-                e.preventDefault();
-                if (isAllProjects) setAllProjectsDragOver(false);
-                const id = e.dataTransfer.getData(MARKUP_DRAG_TYPE);
-                if (id) void moveToRoot(id);
-              }}
-              className={cn(
-                "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-card text-primary shadow-sm"
-                  : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
-                allProjectsDragOver &&
-                  isAllProjects &&
-                  "bg-accent ring-2 ring-primary",
-              )}
+              className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-card/60 hover:text-foreground"
             >
-              <item.icon
-                className={cn(
-                  "size-4",
-                  isActive ? "text-primary" : "text-muted-foreground",
-                )}
-                strokeWidth={1.5}
-              />
+              <item.icon className="size-4" strokeWidth={1.5} />
               {item.label}
             </Link>
-          );
-        })}
-
-        <div className="mt-3 border-t border-border pt-3">
-          <FolderTree workspaceId={current.id} folders={folders} />
+          ))}
         </div>
 
         <div className="mt-auto border-t border-border pt-3">
@@ -161,5 +210,66 @@ export function Sidebar({
         </div>
       </nav>
     </aside>
+  );
+}
+
+function ProjectRow({
+  workspaceId,
+  project,
+  folders,
+}: {
+  workspaceId: string;
+  project: ProjectSummary;
+  folders: FolderNode[];
+}) {
+  const [open, setOpen] = useState(true);
+  const pathname = usePathname();
+  const projectHref = `/w/${workspaceId}?project=${project.id}`;
+  const search = pathname.includes(`/w/${workspaceId}`);
+  const isActive =
+    search &&
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("project") === project.id;
+
+  return (
+    <div className="flex flex-col">
+      <div
+        className={cn(
+          "group flex items-center gap-1 rounded-lg px-1.5 transition-colors",
+          isActive
+            ? "bg-card text-primary"
+            : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
+        )}
+      >
+        <button
+          type="button"
+          aria-label={open ? "Collapse" : "Expand"}
+          onClick={() => setOpen((v) => !v)}
+          className="flex size-5 items-center justify-center rounded transition-colors hover:bg-muted"
+        >
+          {open ? (
+            <ChevronDown className="size-3.5" />
+          ) : (
+            <ChevronRight className="size-3.5" />
+          )}
+        </button>
+        <Link
+          href={projectHref}
+          className="flex flex-1 items-center gap-2 truncate py-1.5 text-sm font-semibold"
+        >
+          <span
+            aria-hidden
+            className="size-2.5 shrink-0 rounded-full"
+            style={{ background: project.color ?? "#6366F1" }}
+          />
+          <span className="truncate">{project.name}</span>
+        </Link>
+      </div>
+      {open ? (
+        <div className="ml-2 border-l border-border/50 pl-1">
+          <FolderTree workspaceId={workspaceId} folders={folders} />
+        </div>
+      ) : null}
+    </div>
   );
 }

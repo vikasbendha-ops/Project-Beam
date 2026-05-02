@@ -274,8 +274,6 @@ export function MarkupCard({
             </div>
           </div>
         </Link>
-        <HoverPreview markup={markup} updated={updated} TypeIcon={TypeIcon} />
-
         <DropdownMenu>
           <DropdownMenuTrigger
             className="absolute right-3 bottom-12 flex size-7 items-center justify-center rounded-md bg-card/95 text-muted-foreground opacity-0 shadow-sm backdrop-blur transition-opacity hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary group-hover:opacity-100 data-[state=open]:opacity-100"
@@ -478,68 +476,6 @@ function CommentHeat({ count }: { count: number }) {
         {count}
       </span>
     </span>
-  );
-}
-
-/**
- * Hover-preview panel. Bigger thumbnail + status + counts. Appears
- * under the card with a 300ms hover delay; positioned absolute so it
- * floats above neighbouring cards.
- */
-function HoverPreview({
-  markup,
-  updated,
-  TypeIcon,
-}: {
-  markup: MarkupSummary;
-  updated: string;
-  TypeIcon: typeof FileText;
-}) {
-  return (
-    <div
-      role="presentation"
-      aria-hidden
-      className={cn(
-        "pointer-events-none absolute left-1/2 top-full z-30 mt-2 w-[260px] -translate-x-1/2 rounded-[14px] border border-border bg-card opacity-0 shadow-modal transition-opacity duration-200 [transition-delay:300ms]",
-        "group-hover:opacity-100 group-hover:[transition-delay:300ms]",
-      )}
-    >
-      <div className="relative aspect-video w-full overflow-hidden rounded-t-[14px] bg-muted">
-        {markup.thumbnail_url ? (
-          <Image
-            src={markup.thumbnail_url}
-            alt=""
-            fill
-            sizes="260px"
-            className="object-cover"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-muted-foreground">
-            <TypeIcon className="size-8" strokeWidth={1.25} />
-          </div>
-        )}
-        {markup.status ? (
-          <div className="absolute right-2 top-2">
-            <StatusPill status={markup.status} size="sm" />
-          </div>
-        ) : null}
-      </div>
-      <div className="space-y-1.5 p-3">
-        <p className="truncate text-sm font-semibold text-foreground">
-          {markup.title ?? "Untitled"}
-        </p>
-        <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
-            <Calendar className="size-3" strokeWidth={1.5} />
-            {updated}
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <MessageSquare className="size-3" strokeWidth={1.5} />
-            {markup.thread_count ?? 0}
-          </span>
-        </div>
-      </div>
-    </div>
   );
 }
 

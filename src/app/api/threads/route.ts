@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
   const {
     markup_id,
     markup_version_id,
+    asset_id: assetIdInput,
     x_position,
     y_position,
     page_number,
@@ -66,11 +67,31 @@ export async function POST(request: NextRequest) {
 
   const threadNumber = (existingCount ?? 0) + 1;
 
+  // Resolve asset_id (NOT NULL on threads): explicit input > markup's
+  // primary asset (position 0).
+  let resolvedAssetId = assetIdInput ?? null;
+  if (!resolvedAssetId) {
+    const { data: primary } = await supabase
+      .from("assets")
+      .select("id")
+      .eq("markup_id", markup_id)
+      .order("position", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    resolvedAssetId = primary?.id ?? null;
+  }
+  if (!resolvedAssetId)
+    return NextResponse.json(
+      { error: "Markup has no asset to attach this thread to." },
+      { status: 400 },
+    );
+
   const { data: thread, error: threadError } = await supabase
     .from("threads")
     .insert({
       markup_id,
       markup_version_id: markup_version_id ?? null,
+      asset_id: resolvedAssetId,
       thread_number: threadNumber,
       x_position,
       y_position,

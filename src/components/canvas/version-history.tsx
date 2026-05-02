@@ -43,6 +43,18 @@ type VersionRow = Pick<
  *  render the document without another network round-trip. */
 export type Version = VersionRow & { signed_url: string | null };
 
+export interface CompareThread {
+  id: string;
+  thread_number: number;
+  x_position: number | null;
+  y_position: number | null;
+  page_number: number | null;
+  status: string;
+  priority: string;
+  markup_version_id: string | null;
+  preview: string | null;
+}
+
 interface VersionHistoryViewProps {
   workspaceId: string;
   markup: { id: string; title: string; type: string };
@@ -54,6 +66,7 @@ interface VersionHistoryViewProps {
     avatar_url: string | null;
   }[];
   threadCountsByVersion: Record<string, number>;
+  threads: CompareThread[];
 }
 
 const ALLOWED_MIMES = ACCEPTED_UPLOAD_MIMES;
@@ -64,6 +77,7 @@ export function VersionHistoryView({
   versions,
   profiles,
   threadCountsByVersion,
+  threads,
 }: VersionHistoryViewProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -400,11 +414,15 @@ export function VersionHistoryView({
                     }`}
                     side="left"
                     version={selected}
+                    threads={threads}
+                    versions={versions}
                   />
                   <PreviewPane
                     label={`v${current.version_number} · Current`}
                     side="right"
                     version={current}
+                    threads={threads}
+                    versions={versions}
                   />
                 </div>
               ) : (
@@ -477,16 +495,32 @@ function PreviewHeader({
   );
 }
 
-/** Side-by-side compare cell: a small caption above the rendered version. */
+/** Side-by-side compare cell: a small caption above the rendered version,
+ *  with all-versions pin overlay (read-only). Pins from any version are
+ *  rendered on every pane at their original % coords; each pin shows a
+ *  small version badge so authors can see context across versions. */
 function PreviewPane({
   label,
   side,
   version,
+  threads,
+  versions,
 }: {
   label: string;
   side: "left" | "right";
   version: Version;
+  threads: CompareThread[];
+  versions: Version[];
 }) {
+  // Map version-id → version-number for badge labels.
+  const versionNumberById = versions.reduce<Record<string, number>>(
+    (acc, v) => {
+      acc[v.id] = v.version_number;
+      return acc;
+    },
+    {},
+  );
+
   return (
     <div
       className={cn(
@@ -503,6 +537,113 @@ function PreviewPane({
           mime={version.mime_type}
           fileName={version.file_name}
         />
+        <ComparePinOverlay
+          threads={threads}
+          activeVersionId={version.id}
+          versionNumberById={versionNumberById}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Read-only pin overlay for the compare panes. Renders pins from EVERY
+ * version on top of whichever version is currently displayed in this pane.
+ * Pins from the active version use the primary tint; pins from other
+ * versions use a dimmer outlined treatment. Hovering a pin reveals its
+ * comment preview + version badge.
+ *
+ * Coords are stored as % of the underlying image so they resolve against
+ * whichever asset this pane is displaying — that's the requested behavior:
+ * "comments of both can be seen on both exactly where they were added".
+ */
+function ComparePinOverlay({
+  threads,
+  activeVersionId,
+  versionNumberById,
+}: {
+  threads: CompareThread[];
+  activeVersionId: string;
+  versionNumberById: Record<string, number>;
+}) {
+  const visible = threads.filter(
+    (t) => t.x_position != null && t.y_position != null,
+  );
+  if (visible.length === 0) return null;
+  return (
+    <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4">
+      {/* The previewed image fills with object-contain inside p-4. We can't
+         know its rendered box exactly here, but pins are absolute-positioned
+         as % of the overlay container which spans the same flex cell — so
+         they line up with the image as long as it's centered + contained. */}
+      <div className="relative h-full w-full">
+        {visible.map((t) => {
+          const isOwnVersion = t.markup_version_id === activeVersionId;
+          const vNum =
+            t.markup_version_id && versionNumberById[t.markup_version_id];
+          return (
+            <div
+              key={t.id}
+              className="group/pin pointer-events-auto absolute"
+              style={{
+                left: `${t.x_position}%`,
+                top: `${t.y_position}%`,
+                transform: "translate(-50%, -50%)",
+              }}
+            >
+              <span
+                className={cn(
+                  "flex size-6 items-center justify-center rounded-full text-[10px] font-bold transition-transform group-hover/pin:scale-110",
+                  isOwnVersion
+                    ? "bg-primary text-primary-foreground shadow-pin"
+                    : "border-2 border-primary/50 bg-card text-primary",
+                  t.status === "resolved" && isOwnVersion
+                    ? "bg-emerald-500"
+                    : "",
+                  t.status === "resolved" && !isOwnVersion
+                    ? "border-emerald-500/50 text-emerald-700"
+                    : "",
+                )}
+                style={{
+                  outline: isOwnVersion ? "2px solid white" : undefined,
+                  outlineOffset: -2,
+                }}
+              >
+                {t.thread_number}
+              </span>
+              {/* Hover preview */}
+              <div className="pointer-events-none absolute left-7 top-0 z-10 hidden w-56 rounded-[10px] border border-border bg-card p-2.5 shadow-modal group-hover/pin:block">
+                <div className="mb-1 flex items-baseline gap-2">
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Pin №{t.thread_number}
+                  </span>
+                  {vNum ? (
+                    <span
+                      className={cn(
+                        "rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider",
+                        isOwnVersion
+                          ? "bg-primary/10 text-primary"
+                          : "bg-amber-500/10 text-amber-700",
+                      )}
+                    >
+                      v{vNum}
+                    </span>
+                  ) : null}
+                </div>
+                {t.preview ? (
+                  <p className="line-clamp-3 text-[11px] leading-relaxed text-foreground">
+                    {t.preview}
+                  </p>
+                ) : (
+                  <p className="text-[11px] italic text-muted-foreground">
+                    Empty thread
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

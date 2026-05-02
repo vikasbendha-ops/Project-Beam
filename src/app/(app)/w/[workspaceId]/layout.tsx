@@ -79,6 +79,7 @@ export default async function WorkspaceLayout({
   const [
     { data: profile },
     { data: folderRows },
+    { data: projects },
     { count: unreadCount },
   ] = await Promise.all([
     supabase
@@ -88,9 +89,15 @@ export default async function WorkspaceLayout({
       .maybeSingle(),
     supabase
       .from("folders")
-      .select("id, name, parent_folder_id")
+      .select("id, name, parent_folder_id, project_id")
       .eq("workspace_id", workspace.id)
       .order("name"),
+    supabase
+      .from("projects")
+      .select("id, name, color, archived")
+      .eq("workspace_id", workspace.id)
+      .eq("archived", false)
+      .order("created_at", { ascending: true }),
     supabase
       .from("notifications")
       .select("*", { count: "exact", head: true })
@@ -99,6 +106,11 @@ export default async function WorkspaceLayout({
   ]);
 
   const folders = buildFolderTree(folderRows ?? []);
+  const projectList = (projects ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    color: p.color,
+  }));
 
   return (
     <FoldersProvider folders={folders}>
@@ -108,6 +120,7 @@ export default async function WorkspaceLayout({
             current={current}
             workspaces={workspaces}
             folders={folders}
+            projects={projectList}
             className="hidden md:flex"
           />
         }
@@ -127,6 +140,7 @@ export default async function WorkspaceLayout({
             current={current}
             workspaces={workspaces}
             folders={folders}
+            projects={projectList}
           />
         }
         modals={

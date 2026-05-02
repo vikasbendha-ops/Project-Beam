@@ -10,10 +10,15 @@ export const metadata: Metadata = {
 
 interface SharePageProps {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ asset?: string }>;
 }
 
-export default async function SharePage({ params }: SharePageProps) {
+export default async function SharePage({
+  params,
+  searchParams,
+}: SharePageProps) {
   const { token } = await params;
+  const { asset: assetParam } = await searchParams;
   const supabase = createServiceClient();
   const share = await resolveShareToken(supabase, token);
   if (!share) notFound();
@@ -27,37 +32,55 @@ export default async function SharePage({ params }: SharePageProps) {
     .maybeSingle();
   if (!markup) notFound();
 
+  // Resolve assets + active asset (multi-asset markups).
+  const { data: assets } = await supabase
+    .from("assets")
+    .select("id, position, title, type, thumbnail_url, source_url")
+    .eq("markup_id", markup.id)
+    .eq("archived", false)
+    .order("position", { ascending: true });
+  const activeAsset =
+    (assetParam && assets?.find((a) => a.id === assetParam)) ||
+    assets?.[0] ||
+    null;
+
   const [{ data: version }, { data: versions }] = await Promise.all([
-    supabase
-      .from("markup_versions")
-      .select(
-        "id, version_number, file_url, file_name, file_size, mime_type, page_count",
-      )
-      .eq("markup_id", markup.id)
-      .eq("is_current", true)
-      .maybeSingle(),
-    supabase
-      .from("markup_versions")
-      .select(
-        "id, version_number, file_url, file_name, file_size, mime_type, is_current, created_at",
-      )
-      .eq("markup_id", markup.id)
-      .order("version_number", { ascending: false }),
+    activeAsset
+      ? supabase
+          .from("markup_versions")
+          .select(
+            "id, version_number, file_url, file_name, file_size, mime_type, page_count",
+          )
+          .eq("asset_id", activeAsset.id)
+          .eq("is_current", true)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    activeAsset
+      ? supabase
+          .from("markup_versions")
+          .select(
+            "id, version_number, file_url, file_name, file_size, mime_type, is_current, created_at",
+          )
+          .eq("asset_id", activeAsset.id)
+          .order("version_number", { ascending: false })
+      : Promise.resolve({ data: [] }),
   ]);
 
-  const { data: threads } = await supabase
-    .from("threads")
-    .select(
-      `id, thread_number, x_position, y_position, page_number, status,
-       priority, created_by, guest_name, guest_email, created_at, updated_at,
-       resolved_at,
-       messages!messages_thread_id_fkey (
-         id, content, attachments, mentions, reactions, created_by, guest_name,
-         guest_email, created_at, edited_at, parent_message_id
-       )`,
-    )
-    .eq("markup_id", markup.id)
-    .order("thread_number", { ascending: true });
+  const { data: threads } = await (activeAsset
+    ? supabase
+        .from("threads")
+        .select(
+          `id, thread_number, x_position, y_position, page_number, status,
+           priority, created_by, guest_name, guest_email, created_at, updated_at,
+           resolved_at,
+           messages!messages_thread_id_fkey (
+             id, content, attachments, mentions, reactions, created_by, guest_name,
+             guest_email, created_at, edited_at, parent_message_id
+           )`,
+        )
+        .eq("asset_id", activeAsset.id)
+        .order("thread_number", { ascending: true })
+    : Promise.resolve({ data: [] }));
 
   const authorIds = Array.from(
     new Set([
@@ -77,11 +100,12 @@ export default async function SharePage({ params }: SharePageProps) {
         .in("id", authorIds)
     : { data: [] };
 
-  // Resolve a 24-hour signed URL for the canvas asset (longer TTL =
-  // browser cache hits across navs).
+  // Resolve a 24-hour signed URL for the active asset's current version.
   const ONE_DAY = 60 * 60 * 24;
-  let canvasUrl: string | null = markup.thumbnail_url;
-  if (version?.file_url && (markup.type === "image" || markup.type === "pdf")) {
+  const activeType = activeAsset?.type ?? markup.type;
+  let canvasUrl: string | null =
+    activeAsset?.thumbnail_url ?? markup.thumbnail_url;
+  if (version?.file_url && (activeType === "image" || activeType === "pdf")) {
     const { data: signed } = await supabase.storage
       .from("markup-files")
       .createSignedUrl(version.file_url, ONE_DAY);
@@ -89,7 +113,7 @@ export default async function SharePage({ params }: SharePageProps) {
   }
   if (
     version?.file_url &&
-    markup.type === "website" &&
+    activeType === "website" &&
     !version.file_url.startsWith("http")
   ) {
     const { data: signed } = await supabase.storage
@@ -105,9 +129,9 @@ export default async function SharePage({ params }: SharePageProps) {
       markup={{
         id: markup.id,
         title: markup.title,
-        type: markup.type,
+        type: activeType,
         status: markup.status,
-        source_url: markup.source_url,
+        source_url: activeAsset?.source_url ?? markup.source_url,
         archived: markup.archived,
         canvasUrl,
       }}
@@ -115,6 +139,14 @@ export default async function SharePage({ params }: SharePageProps) {
       versions={versions ?? []}
       threads={threads ?? []}
       profiles={profiles ?? []}
+      assets={(assets ?? []).map((a) => ({
+        id: a.id,
+        position: a.position,
+        title: a.title,
+        type: a.type,
+        thumbnail_url: a.thumbnail_url,
+      }))}
+      activeAssetId={activeAsset?.id ?? null}
     />
   );
 }

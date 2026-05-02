@@ -4,6 +4,9 @@ export const createThreadSchema = z
   .object({
     markup_id: z.string().uuid(),
     markup_version_id: z.string().uuid().nullable().optional(),
+    /** Asset under the markup. Optional — server resolves to primary
+     *  asset when omitted. */
+    asset_id: z.string().uuid().optional(),
     x_position: z.number().min(0).max(100),
     y_position: z.number().min(0).max(100),
     page_number: z.number().int().positive().nullable().optional(),

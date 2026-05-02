@@ -6,7 +6,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Sidebar } from "@/components/workspace/sidebar";
+import { Sidebar, type ProjectSummary } from "@/components/workspace/sidebar";
 import type { FolderNode } from "@/components/workspace/folder-tree";
 import type { WorkspaceSummary } from "@/components/workspace/workspace-switcher";
 import { useUIStore } from "@/stores/ui-store";
@@ -15,12 +15,14 @@ interface MobileDrawerProps {
   current: WorkspaceSummary;
   workspaces: WorkspaceSummary[];
   folders?: FolderNode[];
+  projects?: ProjectSummary[];
 }
 
 export function MobileDrawer({
   current,
   workspaces,
   folders = [],
+  projects = [],
 }: MobileDrawerProps) {
   const open = useUIStore((s) => s.mobileNavOpen);
   const setOpen = useUIStore((s) => s.setMobileNavOpen);
@@ -38,6 +40,7 @@ export function MobileDrawer({
           current={current}
           workspaces={workspaces}
           folders={folders}
+          projects={projects}
           className="w-full border-r-0"
         />
       </SheetContent>

@@ -14,6 +14,70 @@ export type Database = {
   }
   public: {
     Tables: {
+      assets: {
+        Row: {
+          archived: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          markup_id: string
+          position: number
+          source_url: string | null
+          thumbnail_url: string | null
+          title: string
+          type: Database["public"]["Enums"]["markup_type"]
+          updated_at: string
+        }
+        Insert: {
+          archived?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          markup_id: string
+          position?: number
+          source_url?: string | null
+          thumbnail_url?: string | null
+          title: string
+          type: Database["public"]["Enums"]["markup_type"]
+          updated_at?: string
+        }
+        Update: {
+          archived?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          markup_id?: string
+          position?: number
+          source_url?: string | null
+          thumbnail_url?: string | null
+          title?: string
+          type?: Database["public"]["Enums"]["markup_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assets_markup_id_fkey"
+            columns: ["markup_id"]
+            isOneToOne: false
+            referencedRelation: "markup_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assets_markup_id_fkey"
+            columns: ["markup_id"]
+            isOneToOne: false
+            referencedRelation: "markups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       folders: {
         Row: {
           created_at: string
@@ -21,6 +85,7 @@ export type Database = {
           id: string
           name: string
           parent_folder_id: string | null
+          project_id: string
           updated_at: string
           workspace_id: string
         }
@@ -30,6 +95,7 @@ export type Database = {
           id?: string
           name: string
           parent_folder_id?: string | null
+          project_id: string
           updated_at?: string
           workspace_id: string
         }
@@ -39,6 +105,7 @@ export type Database = {
           id?: string
           name?: string
           parent_folder_id?: string | null
+          project_id?: string
           updated_at?: string
           workspace_id?: string
         }
@@ -55,6 +122,13 @@ export type Database = {
             columns: ["parent_folder_id"]
             isOneToOne: false
             referencedRelation: "folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "folders_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {
@@ -121,6 +195,7 @@ export type Database = {
       }
       markup_versions: {
         Row: {
+          asset_id: string
           created_at: string
           file_name: string | null
           file_size: number | null
@@ -135,6 +210,7 @@ export type Database = {
           version_number: number
         }
         Insert: {
+          asset_id: string
           created_at?: string
           file_name?: string | null
           file_size?: number | null
@@ -149,6 +225,7 @@ export type Database = {
           version_number: number
         }
         Update: {
+          asset_id?: string
           created_at?: string
           file_name?: string | null
           file_size?: number | null
@@ -163,6 +240,13 @@ export type Database = {
           version_number?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "markup_versions_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "markup_versions_markup_id_fkey"
             columns: ["markup_id"]
@@ -196,6 +280,7 @@ export type Database = {
           deleted_at: string | null
           folder_id: string | null
           id: string
+          project_id: string
           source_url: string | null
           status: Database["public"]["Enums"]["markup_status"]
           thumbnail_url: string | null
@@ -213,6 +298,7 @@ export type Database = {
           deleted_at?: string | null
           folder_id?: string | null
           id?: string
+          project_id: string
           source_url?: string | null
           status?: Database["public"]["Enums"]["markup_status"]
           thumbnail_url?: string | null
@@ -230,6 +316,7 @@ export type Database = {
           deleted_at?: string | null
           folder_id?: string | null
           id?: string
+          project_id?: string
           source_url?: string | null
           status?: Database["public"]["Enums"]["markup_status"]
           thumbnail_url?: string | null
@@ -258,6 +345,13 @@ export type Database = {
             columns: ["folder_id"]
             isOneToOne: false
             referencedRelation: "folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "markups_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {
@@ -516,6 +610,61 @@ export type Database = {
         }
         Relationships: []
       }
+      projects: {
+        Row: {
+          archived: boolean
+          color: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          archived?: boolean
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          archived?: boolean
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       share_links: {
         Row: {
           can_comment: boolean
@@ -600,6 +749,7 @@ export type Database = {
       }
       threads: {
         Row: {
+          asset_id: string
           created_at: string
           created_by: string | null
           device_type: Database["public"]["Enums"]["device_type"] | null
@@ -620,6 +770,7 @@ export type Database = {
           y_position: number | null
         }
         Insert: {
+          asset_id: string
           created_at?: string
           created_by?: string | null
           device_type?: Database["public"]["Enums"]["device_type"] | null
@@ -640,6 +791,7 @@ export type Database = {
           y_position?: number | null
         }
         Update: {
+          asset_id?: string
           created_at?: string
           created_by?: string | null
           device_type?: Database["public"]["Enums"]["device_type"] | null
@@ -660,6 +812,13 @@ export type Database = {
           y_position?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "threads_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "threads_created_by_fkey"
             columns: ["created_by"]
@@ -871,12 +1030,15 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           archived: boolean | null
+          asset_count: number | null
           created_at: string | null
           created_by: string | null
+          deleted_at: string | null
           folder_id: string | null
           id: string | null
           latest_version: number | null
           open_thread_count: number | null
+          project_id: string | null
           source_url: string | null
           status: Database["public"]["Enums"]["markup_status"] | null
           thread_count: number | null
@@ -890,12 +1052,15 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           archived?: boolean | null
+          asset_count?: never
           created_at?: string | null
           created_by?: string | null
+          deleted_at?: string | null
           folder_id?: string | null
           id?: string | null
           latest_version?: never
           open_thread_count?: never
+          project_id?: string | null
           source_url?: string | null
           status?: Database["public"]["Enums"]["markup_status"] | null
           thread_count?: never
@@ -909,12 +1074,15 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           archived?: boolean | null
+          asset_count?: never
           created_at?: string | null
           created_by?: string | null
+          deleted_at?: string | null
           folder_id?: string | null
           id?: string | null
           latest_version?: never
           open_thread_count?: never
+          project_id?: string | null
           source_url?: string | null
           status?: Database["public"]["Enums"]["markup_status"] | null
           thread_count?: never
@@ -944,6 +1112,13 @@ export type Database = {
             columns: ["folder_id"]
             isOneToOne: false
             referencedRelation: "folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "markups_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {

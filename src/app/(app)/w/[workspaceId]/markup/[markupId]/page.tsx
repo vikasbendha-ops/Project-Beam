@@ -9,12 +9,17 @@ export const metadata: Metadata = {
 
 interface MarkupPageProps {
   params: Promise<{ workspaceId: string; markupId: string }>;
+  searchParams: Promise<{ asset?: string }>;
 }
 
 const ONE_DAY = 60 * 60 * 24;
 
-export default async function MarkupCanvasPage({ params }: MarkupPageProps) {
+export default async function MarkupCanvasPage({
+  params,
+  searchParams,
+}: MarkupPageProps) {
   const { workspaceId, markupId } = await params;
+  const { asset: assetParam } = await searchParams;
   const supabase = await createClient();
 
   // Phase 1: auth + the markup row in parallel.
@@ -48,6 +53,19 @@ export default async function MarkupCanvasPage({ params }: MarkupPageProps) {
     .is("deleted_at", null)
     .order("created_at", { ascending: true });
 
+  // Multi-asset markups: fetch all assets first, resolve which to display.
+  // ?asset=<id> wins; otherwise primary (lowest position).
+  const { data: assets } = await supabase
+    .from("assets")
+    .select("id, position, title, type, thumbnail_url, source_url, archived")
+    .eq("markup_id", markup.id)
+    .eq("archived", false)
+    .order("position", { ascending: true });
+  const activeAsset =
+    (assetParam && assets?.find((a) => a.id === assetParam)) ||
+    assets?.[0] ||
+    null;
+
   const [
     { data: member },
     { data: version },
@@ -60,27 +78,31 @@ export default async function MarkupCanvasPage({ params }: MarkupPageProps) {
       .eq("workspace_id", markup.workspace_id)
       .eq("user_id", user.id)
       .maybeSingle(),
-    supabase
-      .from("markup_versions")
-      .select(
-        "id, version_number, file_url, file_name, file_size, mime_type, page_count",
-      )
-      .eq("markup_id", markup.id)
-      .eq("is_current", true)
-      .maybeSingle(),
-    supabase
-      .from("threads")
-      .select(
-        `id, thread_number, x_position, y_position, page_number, status,
-         priority, created_by, guest_name, guest_email, created_at, updated_at,
-         resolved_at,
-         messages!messages_thread_id_fkey (
-           id, content, attachments, mentions, reactions, created_by, guest_name,
-           guest_email, created_at, edited_at, parent_message_id
-         )`,
-      )
-      .eq("markup_id", markup.id)
-      .order("thread_number", { ascending: true }),
+    activeAsset
+      ? supabase
+          .from("markup_versions")
+          .select(
+            "id, version_number, file_url, file_name, file_size, mime_type, page_count",
+          )
+          .eq("asset_id", activeAsset.id)
+          .eq("is_current", true)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    activeAsset
+      ? supabase
+          .from("threads")
+          .select(
+            `id, thread_number, x_position, y_position, page_number, status,
+             priority, created_by, guest_name, guest_email, created_at, updated_at,
+             resolved_at, asset_id,
+             messages!messages_thread_id_fkey (
+               id, content, attachments, mentions, reactions, created_by, guest_name,
+               guest_email, created_at, edited_at, parent_message_id
+             )`,
+          )
+          .eq("asset_id", activeAsset.id)
+          .order("thread_number", { ascending: true })
+      : Promise.resolve({ data: [] }),
     markup.folder_id !== null && markup.folder_id !== undefined
       ? siblingsBuilder.eq("folder_id", markup.folder_id)
       : siblingsBuilder.is("folder_id", null),
@@ -90,8 +112,11 @@ export default async function MarkupCanvasPage({ params }: MarkupPageProps) {
 
   // Phase 3: things that need phase-2 results — profiles (need authors)
   // and the signed canvas URL (needs version.file_url). Run in parallel.
+  // Include current user so optimistic comments resolve a name/avatar
+  // before any thread row mentions them.
   const authorIds = Array.from(
     new Set([
+      user.id,
       ...((threads ?? [])
         .map((t) => t.created_by)
         .filter(Boolean) as string[]),
@@ -109,13 +134,14 @@ export default async function MarkupCanvasPage({ params }: MarkupPageProps) {
         .in("id", authorIds)
     : Promise.resolve({ data: [] as { id: string; name: string; email: string; avatar_url: string | null }[] });
 
-  // Sign the canvas URL only when the version actually points at storage.
-  // For website markups using full http URLs, skip signing.
+  // Sign the canvas URL based on the ACTIVE ASSET's type (a markup can mix
+  // image/pdf/website assets).
+  const activeType = activeAsset?.type ?? markup.type;
   const signPromise: Promise<{ data: { signedUrl: string } | null }> =
     (() => {
       if (
         version?.file_url &&
-        (markup.type === "image" || markup.type === "pdf")
+        (activeType === "image" || activeType === "pdf")
       ) {
         return supabase.storage
           .from("markup-files")
@@ -125,7 +151,7 @@ export default async function MarkupCanvasPage({ params }: MarkupPageProps) {
       }
       if (
         version?.file_url &&
-        markup.type === "website" &&
+        activeType === "website" &&
         !version.file_url.startsWith("http")
       ) {
         return supabase.storage
@@ -176,9 +202,9 @@ export default async function MarkupCanvasPage({ params }: MarkupPageProps) {
         markup={{
           id: markup.id,
           title: markup.title,
-          type: markup.type,
+          type: activeType,
           status: markup.status,
-          source_url: markup.source_url,
+          source_url: activeAsset?.source_url ?? markup.source_url,
           archived: markup.archived,
           canvasUrl,
         }}
@@ -192,6 +218,14 @@ export default async function MarkupCanvasPage({ params }: MarkupPageProps) {
           role,
         }}
         workspaceId={markup.workspace_id}
+        assets={(assets ?? []).map((a) => ({
+          id: a.id,
+          position: a.position,
+          title: a.title,
+          type: a.type,
+          thumbnail_url: a.thumbnail_url,
+        }))}
+        activeAssetId={activeAsset?.id ?? null}
       />
     </>
   );

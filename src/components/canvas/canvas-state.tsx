@@ -158,6 +158,9 @@ const CanvasStateContext = createContext<CanvasMutators | null>(null);
 interface CanvasStateProviderProps {
   markupId: string;
   versionId: string | null;
+  /** Active asset for multi-asset markups. Threads in state are scoped to
+   *  this asset; realtime inserts from other assets are filtered out. */
+  assetId?: string | null;
   initialThreads: CanvasThread[];
   currentUser: CanvasCurrentUser;
   currentUserName: string;
@@ -172,6 +175,7 @@ interface CanvasStateProviderProps {
 export function CanvasStateProvider({
   markupId,
   versionId,
+  assetId,
   initialThreads,
   currentUser,
   currentUserName,
@@ -201,7 +205,9 @@ export function CanvasStateProvider({
           event: "INSERT",
           schema: "public",
           table: "threads",
-          filter: `markup_id=eq.${markupId}`,
+          filter: assetId
+            ? `asset_id=eq.${assetId}`
+            : `markup_id=eq.${markupId}`,
         },
         (payload) => {
           const row = payload.new as Record<string, unknown>;
@@ -218,7 +224,9 @@ export function CanvasStateProvider({
           event: "UPDATE",
           schema: "public",
           table: "threads",
-          filter: `markup_id=eq.${markupId}`,
+          filter: assetId
+            ? `asset_id=eq.${assetId}`
+            : `markup_id=eq.${markupId}`,
         },
         (payload) => {
           const row = payload.new as Record<string, unknown>;
@@ -240,7 +248,9 @@ export function CanvasStateProvider({
           event: "DELETE",
           schema: "public",
           table: "threads",
-          filter: `markup_id=eq.${markupId}`,
+          filter: assetId
+            ? `asset_id=eq.${assetId}`
+            : `markup_id=eq.${markupId}`,
         },
         (payload) => {
           const row = payload.old as Record<string, unknown>;
@@ -303,7 +313,7 @@ export function CanvasStateProvider({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [markupId]);
+  }, [markupId, assetId]);
 
   const createThread = useCallback(
     async (input: CreateThreadInput): Promise<string | null> => {
@@ -353,6 +363,7 @@ export function CanvasStateProvider({
           body: JSON.stringify({
             markup_id: markupId,
             markup_version_id: versionId,
+            asset_id: assetId ?? undefined,
             x_position: input.x,
             y_position: input.y,
             page_number: input.pageNumber ?? null,
@@ -394,7 +405,7 @@ export function CanvasStateProvider({
         return null;
       }
     },
-    [markupId, versionId, threads, currentUser.id],
+    [markupId, versionId, assetId, threads, currentUser.id],
   );
 
   const postReply = useCallback(

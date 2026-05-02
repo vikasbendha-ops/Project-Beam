@@ -5,6 +5,7 @@ import { MAX_FOLDER_DEPTH } from "@/lib/constants";
 
 const bodySchema = z.object({
   workspace_id: z.string().uuid(),
+  project_id: z.string().uuid().optional(),
   name: z.string().trim().min(1).max(80),
   parent_folder_id: z.string().uuid().nullable().optional(),
 });
@@ -70,15 +71,42 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Resolve project: explicit > parent's project > workspace's first project.
+  let projectId = parsed.data.project_id ?? null;
+  if (!projectId && parsed.data.parent_folder_id) {
+    const { data: parent } = await supabase
+      .from("folders")
+      .select("project_id")
+      .eq("id", parsed.data.parent_folder_id)
+      .maybeSingle();
+    projectId = parent?.project_id ?? null;
+  }
+  if (!projectId) {
+    const { data: defaultProj } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("workspace_id", parsed.data.workspace_id)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    projectId = defaultProj?.id ?? null;
+  }
+  if (!projectId)
+    return NextResponse.json(
+      { error: "No project available in this workspace." },
+      { status: 400 },
+    );
+
   const { data, error } = await supabase
     .from("folders")
     .insert({
       workspace_id: parsed.data.workspace_id,
+      project_id: projectId,
       parent_folder_id: parsed.data.parent_folder_id ?? null,
       name: parsed.data.name,
       created_by: user.id,
     })
-    .select("id, name, parent_folder_id")
+    .select("id, name, parent_folder_id, project_id")
     .single();
 
   if (error || !data) {

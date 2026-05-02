@@ -18,6 +18,7 @@ export interface FolderNode {
   id: string;
   name: string;
   parent_folder_id: string | null;
+  project_id?: string | null;
   children: FolderNode[];
 }
 

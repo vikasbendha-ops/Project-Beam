@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useMemo } from "react";
 import { CanvasStateProvider, useCanvasMutators } from "@/components/canvas/canvas-state";
+import { AssetRail } from "@/components/canvas/asset-rail";
 import { CanvasTopBar } from "@/components/canvas/canvas-top-bar";
 import { CommentPanel } from "@/components/canvas/comment-panel";
 import { CommentBottomSheet } from "@/components/canvas/comment-bottom-sheet";
@@ -39,6 +40,14 @@ const TextCanvas = dynamic(
   { ssr: false, loading: () => <CanvasLoading label="Loading…" /> },
 );
 
+export interface CanvasAsset {
+  id: string;
+  position: number;
+  title: string;
+  type: string;
+  thumbnail_url: string | null;
+}
+
 interface CanvasViewerProps {
   markup: CanvasMarkup;
   version: CanvasVersion | null;
@@ -47,6 +56,8 @@ interface CanvasViewerProps {
   profiles: CanvasProfile[];
   currentUser: CanvasCurrentUser;
   workspaceId: string;
+  assets: CanvasAsset[];
+  activeAssetId: string | null;
 }
 
 export function CanvasViewer({
@@ -57,6 +68,8 @@ export function CanvasViewer({
   profiles,
   currentUser,
   workspaceId,
+  assets,
+  activeAssetId,
 }: CanvasViewerProps) {
   const profileMap = useMemo(() => {
     const m: Record<string, CanvasProfile> = {};
@@ -73,6 +86,7 @@ export function CanvasViewer({
     <CanvasStateProvider
       markupId={markup.id}
       versionId={version?.id ?? null}
+      assetId={activeAssetId}
       initialThreads={threads}
       currentUser={currentUser}
       currentUserName={currentName}
@@ -85,6 +99,8 @@ export function CanvasViewer({
         profileMap={profileMap}
         currentUser={currentUser}
         workspaceId={workspaceId}
+        assets={assets}
+        activeAssetId={activeAssetId}
       />
     </CanvasStateProvider>
   );
@@ -98,6 +114,8 @@ function CanvasViewerInner({
   profileMap,
   currentUser,
   workspaceId,
+  assets,
+  activeAssetId,
 }: {
   markup: CanvasMarkup;
   version: CanvasVersion | null;
@@ -106,6 +124,8 @@ function CanvasViewerInner({
   profileMap: Record<string, CanvasProfile>;
   currentUser: CanvasCurrentUser;
   workspaceId: string;
+  assets: CanvasAsset[];
+  activeAssetId: string | null;
 }) {
   const isMobile = useIsMobile();
   const activeThreadId = useCanvasStore((s) => s.activeThreadId);
@@ -189,6 +209,7 @@ function CanvasViewerInner({
         workspaceId={workspaceId}
         currentUser={currentUser}
       />
+      <AssetRail assets={assets} activeAssetId={activeAssetId} />
       <div className="flex flex-1 overflow-hidden">
         {!isMobile ? (
           <CommentPanel

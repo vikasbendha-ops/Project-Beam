@@ -9,12 +9,17 @@ export const metadata: Metadata = {
 
 interface VersionsPageProps {
   params: Promise<{ workspaceId: string; markupId: string }>;
+  searchParams: Promise<{ asset?: string }>;
 }
 
 const ONE_DAY = 60 * 60 * 24;
 
-export default async function VersionsPage({ params }: VersionsPageProps) {
+export default async function VersionsPage({
+  params,
+  searchParams,
+}: VersionsPageProps) {
   const { workspaceId, markupId } = await params;
+  const { asset: assetParam } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -29,20 +34,36 @@ export default async function VersionsPage({ params }: VersionsPageProps) {
     .maybeSingle();
   if (!markup || markup.workspace_id !== workspaceId) notFound();
 
-  const { data: versions } = await supabase
+  // Resolve active asset (multi-asset markups). Default = primary.
+  const { data: assets } = await supabase
+    .from("assets")
+    .select("id, position, title, type, thumbnail_url")
+    .eq("markup_id", markupId)
+    .eq("archived", false)
+    .order("position", { ascending: true });
+  const activeAsset =
+    (assetParam && assets?.find((a) => a.id === assetParam)) ||
+    assets?.[0] ||
+    null;
+
+  const versionsQuery = supabase
     .from("markup_versions")
     .select(
-      "id, version_number, file_url, file_name, file_size, mime_type, page_count, uploaded_by, is_current, created_at",
+      "id, version_number, file_url, file_name, file_size, mime_type, page_count, uploaded_by, is_current, created_at, asset_id",
     )
     .eq("markup_id", markupId)
     .order("version_number", { ascending: false });
+  const { data: versions } = activeAsset
+    ? await versionsQuery.eq("asset_id", activeAsset.id)
+    : await versionsQuery;
 
   // Pre-sign each version's file URL so the preview pane can render the
   // actual document — not just metadata. 24h TTL = browser cache hits across
   // selections + page reloads. Website screenshots already store an https://
   // URL in `file_url` (Supabase `screenshots` bucket signed by the Apify
   // webhook); skip re-signing those.
-  const bucket = markup.type === "website" ? "screenshots" : "markup-files";
+  const activeType = activeAsset?.type ?? markup.type;
+  const bucket = activeType === "website" ? "screenshots" : "markup-files";
   const versionsWithUrls = await Promise.all(
     (versions ?? []).map(async (v) => {
       if (!v.file_url) return { ...v, signed_url: null };
@@ -68,10 +89,31 @@ export default async function VersionsPage({ params }: VersionsPageProps) {
         .in("id", uploaderIds)
     : { data: [] };
 
-  const { data: threadCounts } = await supabase
+  // Full thread positions per version — needed by compare view to overlay
+  // both versions' pins on each pane. Scope to the ACTIVE ASSET only —
+  // pins from a different asset aren't relevant in this version-history
+  // view.
+  const threadsQuery = supabase
     .from("threads")
-    .select("markup_version_id")
-    .eq("markup_id", markupId);
+    .select(
+      `id, thread_number, x_position, y_position, page_number, status,
+       priority, markup_version_id, created_at,
+       messages!messages_thread_id_fkey ( id, content, created_at )`,
+    )
+    .eq("markup_id", markupId)
+    .order("thread_number", { ascending: true });
+  const { data: threadRows } = activeAsset
+    ? await threadsQuery.eq("asset_id", activeAsset.id)
+    : await threadsQuery;
+
+  const threadCountsByVersion = (threadRows ?? []).reduce<
+    Record<string, number>
+  >((acc, t) => {
+    if (t.markup_version_id) {
+      acc[t.markup_version_id] = (acc[t.markup_version_id] ?? 0) + 1;
+    }
+    return acc;
+  }, {});
 
   return (
     <VersionHistoryView
@@ -79,14 +121,21 @@ export default async function VersionsPage({ params }: VersionsPageProps) {
       workspaceId={workspaceId}
       versions={versionsWithUrls}
       profiles={profiles ?? []}
-      threadCountsByVersion={(threadCounts ?? []).reduce<
-        Record<string, number>
-      >((acc, t) => {
-        if (t.markup_version_id) {
-          acc[t.markup_version_id] = (acc[t.markup_version_id] ?? 0) + 1;
-        }
-        return acc;
-      }, {})}
+      threadCountsByVersion={threadCountsByVersion}
+      threads={(threadRows ?? []).map((t) => {
+        const firstMsg = (t.messages ?? [])[0];
+        return {
+          id: t.id,
+          thread_number: t.thread_number,
+          x_position: t.x_position,
+          y_position: t.y_position,
+          page_number: t.page_number,
+          status: t.status,
+          priority: t.priority,
+          markup_version_id: t.markup_version_id,
+          preview: firstMsg?.content ?? null,
+        };
+      })}
     />
   );
 }
